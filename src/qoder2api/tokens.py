@@ -1,31 +1,42 @@
 """
-Token 刷新与限额查询（openapi.qoder.sh）
+Token 刷新与限额查询（openapi.qoder.com.cn）
 
 - 刷新：POST /api/v1/deviceToken/refresh（drt-）或 /api/v1/jobToken/refresh（jrt-）
 - 限额：GET /api/v2/quota/usage
 - 后台定时刷新线程：每 6 小时刷新一次全部 enabled 账号的 token
+
+手机端 Fake-IP 会劫持域名解析，因此统一走直连 IP + Host 头（与 campaigns.py 一致）。
 """
 from __future__ import annotations
 
 import threading
 import time
+import uuid
 from typing import Any
 
-import httpx
+import requests
 
+from .campaigns import OPENAPI_DIRECT_IP, OPENAPI_HOST, build_sash_headers
 from .database import get_db
 
-OPENAPI = "https://openapi.qoder.sh"
+OPENAPI = f"https://{OPENAPI_DIRECT_IP}"
 UA = "qoder/1.1.16"
 REFRESH_INTERVAL = 6 * 3600  # 6 小时
 
 
-def _headers() -> dict[str, str]:
+def _base_headers(host: str = OPENAPI_HOST) -> dict[str, str]:
     return {
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "User-Agent": UA,
+        "User-Agent": "Qoder",
+        "Host": host,
     }
+
+
+def _post(path: str, body: dict[str, Any], timeout: int = 25) -> requests.Response:
+    return requests.post(
+        f"{OPENAPI}{path}", json=body, headers=_base_headers(), verify=False, timeout=timeout
+    )
 
 
 def refresh_one_account(uid: str) -> dict[str, Any]:
@@ -42,15 +53,15 @@ def refresh_one_account(uid: str) -> dict[str, Any]:
 
     # drt- → deviceToken/refresh；jrt- → jobToken/refresh
     if rt.startswith("jrt-"):
-        url = f"{OPENAPI}/api/v1/jobToken/refresh"
+        path = "/api/v1/jobToken/refresh"
         token_key = "token"
     else:
-        url = f"{OPENAPI}/api/v1/deviceToken/refresh"
+        path = "/api/v1/deviceToken/refresh"
         token_key = "device_token"
 
     try:
-        r = httpx.post(url, json={"refresh_token": rt}, headers=_headers(), timeout=25)
-    except httpx.HTTPError as e:
+        r = _post(path, {"refresh_token": rt})
+    except requests.RequestException as e:
         return {"ok": False, "uid": uid, "error": f"网络错误: {e}"}
 
     if r.status_code != 200:
@@ -89,23 +100,25 @@ def refresh_all_account_tokens() -> dict[str, Any]:
 
 
 def get_account_quota(uid: str) -> dict[str, Any]:
-    """查询单个账号限额（GET /api/v2/quota/usage）。"""
+    """查询单个账号限额（GET /api/v2/quota/usage，直连 IP 绕过 Fake-IP）。"""
     with get_db() as conn:
         row = conn.execute(
-            "SELECT uid, name, security_oauth_token FROM accounts WHERE uid = ?", (uid,)
+            "SELECT uid, name, security_oauth_token, machine_id FROM accounts WHERE uid = ?", (uid,)
         ).fetchone()
     if not row:
         return {"ok": False, "uid": uid, "error": "账号不存在"}
     tok = row["security_oauth_token"] or ""
     if not tok:
         return {"ok": False, "uid": uid, "error": "无 token"}
+    mid = row["machine_id"] or str(uuid.uuid4())
     try:
-        r = httpx.get(
+        r = requests.get(
             f"{OPENAPI}/api/v2/quota/usage",
-            headers={"Authorization": f"Bearer {tok}", "Accept": "application/json"},
+            headers=build_sash_headers(tok, mid, host=OPENAPI_HOST),
+            verify=False,
             timeout=20,
         )
-    except httpx.HTTPError as e:
+    except requests.RequestException as e:
         return {"ok": False, "uid": uid, "error": f"网络错误: {e}"}
     if r.status_code != 200:
         return {"ok": False, "uid": uid, "error": f"HTTP {r.status_code}: {r.text[:160]}"}

@@ -166,13 +166,14 @@ const TOAST_STYLES: Record<ToastType, { bg: string; border: string; icon: string
 
 // ─── Shared components ───
 
-function Toggle({ checked, onChange, disabled = false }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
+function Toggle({ checked, onChange, disabled = false, title }: { checked: boolean; onChange: () => void; disabled?: boolean; title?: string }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       disabled={disabled}
+      title={title}
       onClick={onChange}
       className={`w-10 h-[22px] rounded-full p-0.5 transition-colors relative shrink-0 ${checked ? 'bg-ink' : 'bg-hairline-strong'} ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
     >
@@ -602,12 +603,27 @@ export default function App() {
     } catch { pushToast('ERROR', lang === 'zh' ? '刷新失败' : 'Refresh failed', '') } finally { setRefreshingTokens(false) }
   }, [authedFetch, lang, pushToast, fetchAccounts])
 
-  const loadQuota = useCallback(async () => {
+  const loadQuota = useCallback(async (notify = false) => {
     try {
       const resp = await authedFetch('/ui/accounts/quota')
       const data = await resp.json()
-      setQuotaList(data.quotas || [])
-    } catch { pushToast('ERROR', lang === 'zh' ? '限额查询失败' : 'Quota query failed', '') }
+      const list: any[] = data.quotas || []
+      setQuotaList(list)
+      if (notify) {
+        const failed = list.filter(q => q.ok === false)
+        if (list.length === 0) {
+          pushToast('INFO', lang === 'zh' ? '没有可查询的账号' : 'No accounts to query', '')
+        } else if (failed.length > 0) {
+          pushToast(
+            'ERROR',
+            lang === 'zh' ? `刷新完成：${list.length - failed.length}/${list.length} 成功` : `Refreshed ${list.length - failed.length}/${list.length}`,
+            String(failed[0]?.error || ''),
+          )
+        } else {
+          pushToast('SUCCESS', lang === 'zh' ? `已刷新 ${list.length} 个账号积分` : `Refreshed ${list.length} account(s)`, '')
+        }
+      }
+    } catch { if (notify) pushToast('ERROR', lang === 'zh' ? '限额查询失败' : 'Quota query failed', '') }
   }, [authedFetch, lang, pushToast])
 
   const fetchLogs = useCallback(async () => {
@@ -1347,7 +1363,7 @@ export default function App() {
                 <button onClick={handleRefreshStatus} className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-hairline bg-white text-[11px] font-medium text-body hover:text-ink transition-colors">
                   <span className="material-symbols-outlined text-[15px]">bolt</span>{lang === 'zh' ? '强制重试' : 'Force retry'}
                 </button>
-                <button onClick={loadQuota} className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-hairline bg-white text-[11px] font-medium text-body hover:text-ink transition-colors">
+                <button onClick={() => loadQuota(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-hairline bg-white text-[11px] font-medium text-body hover:text-ink transition-colors">
                   <span className="material-symbols-outlined text-[15px]">data_usage</span>{lang === 'zh' ? '刷新积分' : 'Refresh credits'}
                 </button>
                 <button onClick={doRefreshTokens} disabled={refreshingTokens} className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-hairline bg-white text-[11px] font-medium text-body hover:text-ink transition-colors disabled:opacity-40">
@@ -1399,14 +1415,14 @@ export default function App() {
                   <table className="w-full text-left">
                     <thead>
                       <tr className="border-b border-hairline bg-canvas-soft">
-                        {[lang === 'zh' ? '账号' : 'Account', 'UID', lang === 'zh' ? '状态' : 'Status', lang === 'zh' ? '积分余额' : 'Credits', lang === 'zh' ? 'Token 有效期' : 'Token expiry', lang === 'zh' ? '操作' : 'Actions'].map((h, i) => (
-                          <th key={i} className={`px-4 py-2.5 text-[9px] font-medium text-body uppercase tracking-wider ${i === 5 ? 'text-right' : ''}`}>{h}</th>
+                        {[lang === 'zh' ? '账号' : 'Account', 'UID', lang === 'zh' ? '状态' : 'Status', lang === 'zh' ? '积分余额' : 'Credits', lang === 'zh' ? 'Token 有效期' : 'Token expiry', lang === 'zh' ? '参与轮转' : 'Rotation', lang === 'zh' ? '操作' : 'Actions'].map((h, i) => (
+                          <th key={i} className={`px-4 py-2.5 text-[9px] font-medium text-body uppercase tracking-wider ${i === 5 ? 'text-center' : i === 6 ? 'text-right' : ''}`}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-hairline">
                       {filteredAccounts.length === 0 ? (
-                        <tr><td colSpan={6} className="py-12 text-center text-xs text-body">{t.accounts.empty}</td></tr>
+                        <tr><td colSpan={7} className="py-12 text-center text-xs text-body">{t.accounts.empty}</td></tr>
                       ) : filteredAccounts.map(acc => {
                         const isActive = accountsConfig.active_uid === acc.uid
                         const perAccount = quotaByUid.get(acc.uid)?.quota?.userQuota
@@ -1489,9 +1505,18 @@ export default function App() {
                                 </div>
                               )}
                             </td>
+                            <td className="px-4 py-3.5 text-center">
+                              <Toggle
+                                checked={acc.enabled}
+                                onChange={() => handleToggleAccount(acc.uid, !acc.enabled)}
+                                title={lang === 'zh'
+                                  ? '参与自动轮转。关闭后该账号将被跳过（不会合并积分）'
+                                  : 'Join auto-rotation. Disabled accounts are skipped.'}
+                              />
+                            </td>
                             <td className="px-4 py-3.5">
                               <div className="flex items-center justify-end gap-1">
-                                <button onClick={() => handleSelectAccount(acc.uid)} disabled={isActive || !acc.enabled} title={lang === 'zh' ? '设为当前' : 'Set active'}
+                                <button onClick={() => handleSelectAccount(acc.uid)} disabled={isActive || !acc.enabled} title={lang === 'zh' ? '设为优先账号（网关优先使用）' : 'Set preferred account'}
                                   className="p-1.5 text-body hover:text-ink hover:bg-hairline rounded-md disabled:opacity-25 transition-colors">
                                   <span className="material-symbols-outlined text-[16px]">play_circle</span>
                                 </button>
@@ -1499,7 +1524,6 @@ export default function App() {
                                   className="p-1.5 text-body hover:text-ink hover:bg-hairline rounded-md transition-colors">
                                   <span className="material-symbols-outlined text-[16px]">content_copy</span>
                                 </button>
-                                <Toggle checked={acc.enabled} onChange={() => handleToggleAccount(acc.uid, !acc.enabled)} />
                                 <button onClick={() => handleDeleteAccount(acc.uid)} title={t.common.delete}
                                   className="p-1.5 text-body hover:text-toast-error hover:bg-toast-error/10 rounded-md transition-colors">
                                   <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -1512,8 +1536,16 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
-                <div className="px-4 py-2.5 border-t border-hairline bg-canvas-soft flex items-center justify-between">
-                  <p className="text-[10px] text-body">{t.accounts.showing.replace('{count}', String(filteredAccounts.length))}</p>
+                <div className="px-4 py-2.5 border-t border-hairline bg-canvas-soft flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[10px] text-body">
+                    {t.accounts.showing.replace('{count}', String(filteredAccounts.length))}
+                    <span className="text-body/70">
+                      {' · '}
+                      {lang === 'zh'
+                        ? '网关优先使用「当前」账号；额度耗尽或鉴权失败时自动切换到下一个启用账号'
+                        : 'Gateway prefers the active account; rotates to the next enabled one on quota/auth failure'}
+                    </span>
+                  </p>
                   <p className="text-[10px] text-body/70">{lang === 'zh' ? '积分余额 = 主套餐 + 签到算力 · 有效期进度以 7 天为满格' : 'Credits = plan + add-on · expiry bar scaled to 7 days'}</p>
                 </div>
               </section>
