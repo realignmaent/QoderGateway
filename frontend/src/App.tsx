@@ -983,6 +983,13 @@ export default function App() {
   const isClaimed = targetCampaign?.claimStatus === 'CLAIMED'
   const planQuota = usageData?.quota?.userQuota || null
   const addOnQuota = usageData?.quota?.addOnQuota || null
+  const combinedPlanQuota = planQuota
+    ? {
+        total: (planQuota.total || 0) + (addOnQuota?.total || 0),
+        used: (planQuota.used || 0) + (addOnQuota?.used || 0),
+        remaining: (planQuota.remaining || 0) + (addOnQuota?.remaining || 0),
+      }
+    : null
   const planUsedPct = planQuota && planQuota.total ? Math.min(100, Math.round(((planQuota.used || 0) / planQuota.total) * 100)) : null
   const expiresAt = usageData?.quota?.expiresAt ? new Date(usageData.quota.expiresAt).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US') : null
   const userType = usageData?.quota?.userType || null
@@ -1134,10 +1141,18 @@ export default function App() {
                       </div>
                     )}
                     {accounts.map(acc => {
+                      const isActiveAcc = acc.uid === accountsConfig.active_uid
                       const perAccount = quotaByUid.get(acc.uid)?.quota?.userQuota
-                      const q = perAccount && perAccount.total
-                        ? perAccount
-                        : (acc.uid === accountsConfig.active_uid && planQuota?.total ? planQuota : null)
+                      const baseQ = perAccount && perAccount.total ? perAccount : (isActiveAcc ? planQuota : null)
+                      const q = baseQ
+                        ? (isActiveAcc && addOnQuota
+                            ? {
+                                total: (baseQ.total || 0) + (addOnQuota.total || 0),
+                                used: (baseQ.used || 0) + (addOnQuota.used || 0),
+                                remaining: (baseQ.remaining || 0) + (addOnQuota.remaining || 0),
+                              }
+                            : baseQ)
+                        : null
                       const hasDetail = Boolean(q && q.total)
                       const usedPct = hasDetail && q ? Math.min(100, Math.round((q.used / q.total) * 100)) : null
                       const isHealthy = acc.enabled && acc.last_status === 'ok' && !acc.is_quota_exceeded
@@ -1332,9 +1347,16 @@ export default function App() {
                       ) : filteredAccounts.map(acc => {
                         const isActive = accountsConfig.active_uid === acc.uid
                         const perAccount = quotaByUid.get(acc.uid)?.quota?.userQuota
-                        const q = perAccount && perAccount.total
-                          ? perAccount
-                          : (isActive && planQuota?.total ? planQuota : null)
+                        const baseQ = perAccount && perAccount.total ? perAccount : (isActive ? planQuota : null)
+                        const q = baseQ
+                          ? (isActive && addOnQuota
+                              ? {
+                                  total: (baseQ.total || 0) + (addOnQuota.total || 0),
+                                  used: (baseQ.used || 0) + (addOnQuota.used || 0),
+                                  remaining: (baseQ.remaining || 0) + (addOnQuota.remaining || 0),
+                                }
+                              : baseQ)
+                          : null
                         const hasQuotaDetail = Boolean(q && q.total)
                         const usedPct = hasQuotaDetail && q ? Math.min(100, Math.round((q.used / q.total) * 100)) : null
                         const expiresTs = acc.token_expires_at ? new Date(acc.token_expires_at).getTime() : 0
@@ -1429,7 +1451,7 @@ export default function App() {
                 </div>
                 <div className="px-4 py-2.5 border-t border-hairline bg-canvas-soft flex items-center justify-between">
                   <p className="text-[10px] text-body">{t.accounts.showing.replace('{count}', String(filteredAccounts.length))}</p>
-                  <p className="text-[10px] text-body/70">{lang === 'zh' ? 'Token 有效期进度以 7 天为满格' : 'Expiry bar scaled to 7 days'}</p>
+                  <p className="text-[10px] text-body/70">{lang === 'zh' ? '积分余额 = 主套餐 + 签到算力 · 有效期进度以 7 天为满格' : 'Credits = plan + add-on · expiry bar scaled to 7 days'}</p>
                 </div>
               </section>
             </div>
