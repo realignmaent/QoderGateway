@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, Body
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -32,6 +32,14 @@ from .tokens import (
     get_all_accounts_quota,
     start_refresh_loop,
 )
+from .campaigns import (
+    fetch_qoder_campaigns,
+    claim_account_daily,
+    fetch_quota_usage,
+    start_auto_claim_loop,
+    get_all_raw_accounts,
+)
+
 
 BASE_DIR = os.path.dirname(__file__)
 INDEX_HTML = Path(BASE_DIR) / "static" / "index.html"
@@ -248,6 +256,53 @@ async def accounts_quota(verify: None = Depends(check_gateway_token)) -> dict[st
     return get_all_accounts_quota()
 
 
+@app.get("/ui/campaigns")
+async def get_campaigns(verify: None = Depends(check_gateway_token)) -> dict[str, Any]:
+    """获取当前活动账号的每日签到福利与活动状态。"""
+    accs = get_all_raw_accounts()
+    if not accs:
+        return {"ok": False, "error": "No accounts available"}
+    active_uid = db_get_settings("active_uid")
+    acc = next((a for a in accs if a["uid"] == active_uid), accs[0])
+    token = acc.get("security_oauth_token") or ""
+    mid = acc.get("machine_id") or ""
+    return fetch_qoder_campaigns(token, mid)
+
+
+@app.post("/ui/claim")
+async def claim_benefits(payload: dict[str, Any] = Body(default={}), verify: None = Depends(check_gateway_token)) -> dict[str, Any]:
+    """手动触发签到打卡领取 100 Credits。"""
+    accs = get_all_raw_accounts()
+    if not accs:
+        return {"ok": False, "error": "No accounts available"}
+    results = []
+    for acc in accs:
+        if acc.get("enabled", 1):
+            res = claim_account_daily(acc)
+            results.append({"name": acc.get("name") or acc.get("uid"), **res})
+    return {"ok": True, "results": results}
+
+
+@app.get("/ui/usage-overview")
+async def usage_overview(verify: None = Depends(check_gateway_token)) -> dict[str, Any]:
+    """聚合获取当前账号的详细用量与额度分析（主套餐、签到通用算力等）。"""
+    accs = get_all_raw_accounts()
+    if not accs:
+        return {"ok": False, "error": "No accounts"}
+    active_uid = db_get_settings("active_uid")
+    acc = next((a for a in accs if a["uid"] == active_uid), accs[0])
+    token = acc.get("security_oauth_token") or ""
+    mid = acc.get("machine_id") or ""
+    u_res = fetch_quota_usage(token, mid)
+    c_res = fetch_qoder_campaigns(token, mid)
+    return {
+        "ok": True,
+        "quota": u_res.get("data") if u_res.get("ok") else None,
+        "campaigns": c_res.get("data") if c_res.get("ok") else None,
+    }
+
+
+
 @app.delete("/ui/accounts/{uid}")
 async def delete_account(uid: str, verify: None = Depends(check_gateway_token)) -> dict[str, Any]:
     with get_db() as conn:
@@ -458,10 +513,33 @@ async def chat_completions(payload: dict[str, Any], authorization: str | None = 
     raise HTTPException(status_code=502, detail="Request failed on all available accounts.")
 
 
+@app.get("/v1/models")
+async def list_models():
+    """标准 OpenAI 模型列表端点，供 CherryStudio / NextChat / OpenWebUI 等客户端自动拉取。"""
+    models_list = [
+        {"id": "auto", "object": "model", "owned_by": "qoder", "display_name": "Auto (智能路由 200K)", "context_length": 200000},
+        {"id": "qwen3.8-max", "object": "model", "owned_by": "alibaba", "display_name": "Qwen3.8-Max (通义旗舰思考 1M)", "context_length": 1000000},
+        {"id": "qwen3.8-flash", "object": "model", "owned_by": "alibaba", "display_name": "Qwen3.8-Flash (极速思考·免费 1M)", "context_length": 1000000},
+        {"id": "qwen3.7-plus", "object": "model", "owned_by": "alibaba", "display_name": "Qwen3.7-Plus (通用低倍率 1M)", "context_length": 1000000},
+        {"id": "deepseek-v4-pro", "object": "model", "owned_by": "deepseek", "display_name": "DeepSeek-V4-Pro (深度推理 1M)", "context_length": 1000000},
+        {"id": "deepseek-flash", "object": "model", "owned_by": "deepseek", "display_name": "DeepSeek-Flash (极速·免费 1M)", "context_length": 1000000},
+        {"id": "glm-5.3", "object": "model", "owned_by": "zhipu", "display_name": "GLM-5.3 (智谱推理旗舰 1M)", "context_length": 1000000},
+        {"id": "glm-5.3-flash", "object": "model", "owned_by": "zhipu", "display_name": "GLM-5.3-Flash (1M超长上下文)", "context_length": 1000000},
+        {"id": "kimi-k3", "object": "model", "owned_by": "moonshot", "display_name": "Kimi-K3 (长程旗舰 1M)", "context_length": 1000000},
+        {"id": "kimi-k2.8", "object": "model", "owned_by": "moonshot", "display_name": "Kimi-K2.8-Preview (代码专家 1M)", "context_length": 1000000},
+        {"id": "minimax-m3.1-flash", "object": "model", "owned_by": "minimax", "display_name": "MiniMax-M3.1-Flash (极速文本 200K)", "context_length": 200000},
+    ]
+    return {"object": "list", "data": models_list}
+
+
+
+
 def main() -> None:
     import uvicorn
 
     start_refresh_loop()  # 启动 token 定时刷新线程（每 6 小时）
+    start_auto_claim_loop()  # 启动每日自动签到打卡线程（每日 10:05 自动领 100 Credits）
+
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default=os.getenv("QODER_HOST", "127.0.0.1"))
