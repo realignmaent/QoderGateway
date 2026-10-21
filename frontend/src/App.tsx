@@ -57,29 +57,42 @@ interface QuotaEntry {
   quota: { userQuota: { total: number; used: number; remaining: number; percentage: number } }
 }
 
-// ─── Model catalog ───
+// ─── Model catalog (loaded from GET /v1/models) ───
 
 interface ModelInfo {
-  id: string; name: string; provider: string; series: string; desc: string
-  context: string; maxOutput: string; efforts: string[]; defaultEffort: string
-  caps: string[]; price: string; free: boolean
+  id: string
+  name: string
+  provider: string
+  series: string
+  description: string
+  contextLength: number
+  efforts: string[]
+  defaultEffort: string
+  capabilities: string[]
+  rate: string
+  free: boolean
 }
 
-const AVAILABLE_MODELS: ModelInfo[] = [
-  { id: 'auto', name: 'Auto', provider: 'Qoder', series: 'Qoder', desc: '平台智能动态路由（自适应最适底座）', context: '200K', maxOutput: '31K', efforts: ['自适应'], defaultEffort: '自适应', caps: ['智能路由', '文本'], price: '0.5x', free: false },
-  { id: 'qwen3.8-max', name: 'Qwen3.8-Max', provider: '阿里通义', series: 'Qwen', desc: '通义顶配旗舰思考大模型（强逻辑/代码）', context: '1000K (1M)', maxOutput: '63K', efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'xhigh', caps: ['文本', '仅推理'], price: '0.5x', free: false },
-  { id: 'qwen3.8-flash', name: 'Qwen3.8-Flash', provider: '阿里通义', series: 'Qwen', desc: '极速思考模型·高频日常调用推荐', context: '1000K (1M)', maxOutput: '63K', efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'xhigh', caps: ['文本', '仅推理'], price: '0.0x', free: true },
-  { id: 'qwen3.7-plus', name: 'Qwen3.7-Plus', provider: '阿里通义', series: 'Qwen', desc: '全功能通用超低倍率模型', context: '1000K (1M)', maxOutput: '63K', efforts: ['low', 'medium', 'high'], defaultEffort: 'high', caps: ['文本'], price: '0.1x', free: false },
-  { id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', provider: 'DeepSeek', series: 'DeepSeek', desc: '深度求索极致推理大模型（复杂算法与数学）', context: '1000K (1M)', maxOutput: '125K', efforts: ['low', 'medium', 'high', 'max'], defaultEffort: 'max', caps: ['文本', '仅推理'], price: '0.5x', free: false },
-  { id: 'deepseek-flash', name: 'DeepSeek-Flash', provider: 'DeepSeek', series: 'DeepSeek', desc: '深度求索极速·不限额度免费调用', context: '1000K (1M)', maxOutput: '63K', efforts: ['low', 'medium', 'high', 'max'], defaultEffort: 'max', caps: ['文本'], price: '0.0x', free: true },
-  { id: 'glm-5.3', name: 'GLM-5.3', provider: '智谱 AI', series: '智谱 GLM', desc: '智谱 AI 新一代推理旗舰（中文深度对齐）', context: '1000K (1M)', maxOutput: '128K', efforts: ['low', 'medium', 'high', 'max'], defaultEffort: 'max', caps: ['多模态', '仅推理'], price: '0.8x', free: false },
-  { id: 'glm-5.3-flash', name: 'GLM-5.3-Flash', provider: '智谱 AI', series: '智谱 GLM', desc: '原生百万长文本分析专家（文档/长代码）', context: '1000K (1M)', maxOutput: '128K', efforts: ['low', 'medium', 'high', 'max'], defaultEffort: 'max', caps: ['多模态'], price: '0.1x', free: false },
-  { id: 'kimi-k3', name: 'Kimi-K3', provider: '月之暗面', series: 'Kimi', desc: '月之暗面长程旗舰推理（长程推演与学术）', context: '1000K (1M)', maxOutput: '63K', efforts: ['low', 'high', 'xhigh'], defaultEffort: 'xhigh', caps: ['多模态', '仅推理'], price: '1.4x', free: false },
-  { id: 'kimi-k2.8', name: 'Kimi-K2.8-Preview', provider: '月之暗面', series: 'Kimi', desc: '代码架构与工程推演专家', context: '1000K (1M)', maxOutput: '63K', efforts: ['low', 'high', 'max'], defaultEffort: 'max', caps: ['文本', '仅推理'], price: '0.8x', free: false },
-  { id: 'minimax-m3.1-flash', name: 'MiniMax-M3.1-Flash', provider: 'MiniMax', series: 'MiniMax', desc: '超低延迟极速文本与对话', context: '200K', maxOutput: '31K', efforts: ['low', 'medium'], defaultEffort: 'medium', caps: ['文本'], price: '0.1x', free: false },
-]
+function formatContext(tokens: number): string {
+  if (!tokens) return '—'
+  return tokens >= 1_000_000 ? '1M' : `${Math.round(tokens / 1000)}K`
+}
 
-const MODEL_SERIES = ['全部', 'Qoder', 'Qwen', 'DeepSeek', '智谱 GLM', 'Kimi', 'MiniMax']
+function mapModel(raw: any): ModelInfo {
+  return {
+    id: String(raw?.id || ''),
+    name: String(raw?.display_name || raw?.id || ''),
+    provider: String(raw?.owned_by || ''),
+    series: String(raw?.series || raw?.owned_by || ''),
+    description: String(raw?.description || ''),
+    contextLength: Number(raw?.context_length || 0),
+    efforts: Array.isArray(raw?.efforts) ? raw.efforts : [],
+    defaultEffort: String(raw?.default_effort || ''),
+    capabilities: Array.isArray(raw?.capabilities) ? raw.capabilities : [],
+    rate: String(raw?.rate || ''),
+    free: Boolean(raw?.free),
+  }
+}
 
 // ─── Navigation / i18n ───
 
@@ -394,6 +407,8 @@ export default function App() {
   const [usageData, setUsageData] = useState<any>(null)
   const [claiming, setClaiming] = useState(false)
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null)
+  const [models, setModels] = useState<ModelInfo[]>([])
+  const [modelsError, setModelsError] = useState(false)
 
   const [modelSeries, setModelSeries] = useState('全部')
   const [modelCaps, setModelCaps] = useState<string[]>([])
@@ -519,6 +534,17 @@ export default function App() {
       if (data.ok) setUsageStats(data)
     } catch { /* */ }
   }, [authedFetch])
+  const fetchModels = useCallback(async () => {
+    try {
+      const resp = await fetch('/v1/models')
+      const data = await resp.json()
+      const list = (data?.data || []).map(mapModel).filter((m: ModelInfo) => m.id)
+      setModels(list)
+      setModelsError(list.length === 0)
+    } catch {
+      setModelsError(true)
+    }
+  }, [])
 
   const handleClaimDaily = async () => {
     setClaiming(true)
@@ -620,13 +646,13 @@ export default function App() {
 
   useEffect(() => {
     if (!token) return
-    fetchStatus(); fetchAccounts(); fetchApiConfig(); fetchUsageOverview(); fetchUsageStats(); fetchLogs(); fetchRegStatus(); loadQuota()
+    fetchStatus(); fetchAccounts(); fetchApiConfig(); fetchUsageOverview(); fetchUsageStats(); fetchModels(); fetchLogs(); fetchRegStatus(); loadQuota()
     const si = setInterval(fetchStatus, 6000)
     const ui = setInterval(fetchUsageStats, 30000)
     const li = setInterval(() => { if (activeTab === 'logs') fetchLogs() }, 3000)
     const ri = setInterval(() => { if (activeTab === 'register' && regStatus?.running) fetchRegStatus() }, 2000)
     return () => { clearInterval(si); clearInterval(ui); clearInterval(li); clearInterval(ri) }
-  }, [token, activeTab, fetchStatus, fetchAccounts, fetchApiConfig, fetchUsageOverview, fetchUsageStats, fetchLogs, fetchRegStatus, loadQuota, regStatus?.running])
+  }, [token, activeTab, fetchStatus, fetchAccounts, fetchApiConfig, fetchUsageOverview, fetchUsageStats, fetchModels, fetchLogs, fetchRegStatus, loadQuota, regStatus?.running])
 
   useEffect(() => { if (activeTab === 'logs') logEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [logs, activeTab])
   useEffect(() => { if (activeTab === 'playground') chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages, activeTab])
@@ -933,11 +959,11 @@ export default function App() {
       return 0
     })
 
-  const filteredModels = AVAILABLE_MODELS.filter(m => {
+  const filteredModels = models.filter(m => {
     if (modelSeries !== '全部' && m.series !== modelSeries) return false
     if (modelCaps.length > 0) {
       if (modelCaps.includes('支持推理') && !m.efforts.some(e => e !== '自适应')) return false
-      if (modelCaps.includes('1M 上下文') && !m.context.includes('1M')) return false
+      if (modelCaps.includes('1M 上下文') && m.contextLength < 1_000_000) return false
       if (modelCaps.includes('免费') && !m.free) return false
     }
     if (modelQuery) {
@@ -946,18 +972,21 @@ export default function App() {
     }
     return true
   })
+  const modelSeriesOptions = ['全部', ...Array.from(new Set(models.map(m => m.series).filter(Boolean)))]
 
-  const maxContext = Math.max(...AVAILABLE_MODELS.map(m => m.context.includes('1M') ? 1000 : 200))
-  const reasoningCount = AVAILABLE_MODELS.filter(m => m.efforts.some(e => e !== '自适应')).length
+  const maxContext = models.reduce((max, m) => Math.max(max, m.contextLength), 0)
+  const reasoningCount = models.filter(m => m.efforts.some(e => e !== '自适应')).length
+  const freeCount = models.filter(m => m.free).length
 
   const campaigns = usageData?.campaigns?.campaigns || []
   const targetCampaign = campaigns.find((c: any) => c.actionType === 'CLAIM_BENEFIT') || campaigns[0]
   const isClaimed = targetCampaign?.claimStatus === 'CLAIMED'
-  const planQuota = usageData?.quota?.userQuota || { total: 300, used: 0, remaining: 300 }
-  const addOnQuota = usageData?.quota?.addOnQuota || { total: 0, remaining: 0, used: 0 }
-  const planUsedPct = Math.min(100, Math.round(((planQuota.used || 0) / (planQuota.total || 300)) * 100))
-  const expiresAt = usageData?.quota?.expiresAt ? new Date(usageData.quota.expiresAt).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US') : '—'
-  const userType = usageData?.quota?.userType || 'personal_professional_trial'
+  const planQuota = usageData?.quota?.userQuota || null
+  const addOnQuota = usageData?.quota?.addOnQuota || null
+  const planUsedPct = planQuota && planQuota.total ? Math.min(100, Math.round(((planQuota.used || 0) / planQuota.total) * 100)) : null
+  const expiresAt = usageData?.quota?.expiresAt ? new Date(usageData.quota.expiresAt).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US') : null
+  const userType = usageData?.quota?.userType || null
+  const canClaim = accounts.length > 0
 
   const page = pageMeta[activeTab]
 
@@ -1028,15 +1057,33 @@ export default function App() {
                 </div>
                 <div className="stat-card card p-4">
                   <div className="text-[10px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '主配额' : 'Plan Quota'}</div>
-                  <div className="font-display-md text-ink leading-none">{planQuota.remaining}<span className="text-xs text-body font-sans">/{planQuota.total}</span></div>
-                  <div className="w-full bg-hairline h-1 rounded-full mt-2 overflow-hidden">
-                    <div className="bg-ink h-full rounded-full transition-all" style={{ width: `${Math.max(2, planUsedPct)}%` }}></div>
-                  </div>
+                  {planQuota ? (
+                    <>
+                      <div className="font-display-md text-ink leading-none">{planQuota.remaining}<span className="text-xs text-body font-sans">/{planQuota.total}</span></div>
+                      <div className="w-full bg-hairline h-1 rounded-full mt-2 overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${planUsedPct !== null && planUsedPct >= 85 ? 'bg-peach-deep' : 'bg-ink'}`} style={{ width: `${Math.max(2, planUsedPct ?? 0)}%` }}></div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-display-md text-body/30 leading-none">—</div>
+                      <div className="text-[10px] text-body mt-2">{accounts.length === 0 ? (lang === 'zh' ? '无账号数据' : 'No account') : (lang === 'zh' ? '额度读取失败' : 'Quota unavailable')}</div>
+                    </>
+                  )}
                 </div>
                 <div className="stat-card card p-4">
                   <div className="text-[10px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '签到算力' : 'Add-on'}</div>
-                  <div className="font-display-md text-peach-deep leading-none">{addOnQuota.remaining}</div>
-                  <div className="text-[11px] text-body mt-1.5">{lang === 'zh' ? '30 天滚动有效' : '30-day rolling'}</div>
+                  {addOnQuota ? (
+                    <>
+                      <div className="font-display-md text-peach-deep leading-none">{addOnQuota.remaining}</div>
+                      <div className="text-[11px] text-body mt-1.5">{lang === 'zh' ? '30 天滚动有效' : '30-day rolling'}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-display-md text-body/30 leading-none">—</div>
+                      <div className="text-[10px] text-body mt-2">{lang === 'zh' ? '暂无数据' : 'No data'}</div>
+                    </>
+                  )}
                 </div>
                 <div className="stat-card card p-4">
                   <div className="text-[10px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '每日签到' : 'Check-in'}</div>
@@ -1046,10 +1093,11 @@ export default function App() {
                       <span className="text-sm font-medium">{lang === 'zh' ? '今日已领 100' : 'Claimed 100'}</span>
                     </div>
                   ) : (
-                    <button onClick={handleClaimDaily} disabled={claiming}
-                      className="w-full px-3 py-1.5 bg-peach-deep text-white text-xs font-medium rounded-full hover:bg-peach-deep/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1">
+                    <button onClick={handleClaimDaily} disabled={claiming || !canClaim}
+                      title={!canClaim ? (lang === 'zh' ? '请先添加账号' : 'Add an account first') : undefined}
+                      className="w-full px-3 py-1.5 bg-peach-deep text-white text-xs font-medium rounded-full hover:bg-peach-deep/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1">
                       <span className="material-symbols-outlined text-[14px]">card_giftcard</span>
-                      {claiming ? '...' : (lang === 'zh' ? '打卡领取' : 'Claim')}
+                      {claiming ? '...' : !canClaim ? (lang === 'zh' ? '无可用账号' : 'No account') : (lang === 'zh' ? '打卡领取' : 'Claim')}
                     </button>
                   )}
                   <div className="text-[11px] text-body mt-1.5">{lang === 'zh' ? '每日 10:05 自动' : 'Auto at 10:05'}</div>
@@ -1087,8 +1135,8 @@ export default function App() {
                     )}
                     {accounts.map(acc => {
                       const q = quotaByUid.get(acc.uid)?.quota?.userQuota
-                      const usedPct = q && q.total ? Math.min(100, Math.round((q.used / q.total) * 100)) : (acc.quota ? 100 : 0)
-                      const remaining = q ? q.remaining : acc.quota
+                      const hasDetail = Boolean(q && q.total)
+                      const usedPct = hasDetail && q ? Math.min(100, Math.round((q.used / q.total) * 100)) : null
                       const isHealthy = acc.enabled && acc.last_status === 'ok' && !acc.is_quota_exceeded
                       return (
                         <div key={acc.uid} className={`rounded-xl p-3 ${acc.uid === accountsConfig.active_uid ? 'bg-canvas-soft ring-1 ring-hairline-strong' : 'bg-canvas-soft'}`}>
@@ -1102,11 +1150,15 @@ export default function App() {
                               {!acc.enabled ? (lang === 'zh' ? '已停用' : 'Disabled') : acc.is_quota_exceeded ? (lang === 'zh' ? '超额' : 'Exceeded') : isHealthy ? (lang === 'zh' ? '正常' : 'OK') : (lang === 'zh' ? '异常' : 'Error')}
                             </span>
                           </div>
-                          <div className="mt-2 h-1.5 bg-hairline rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${usedPct > 85 ? 'bg-peach-deep' : 'bg-mint-deep'}`} style={{ width: `${Math.max(2, usedPct)}%` }} />
-                          </div>
+                          {usedPct !== null ? (
+                            <div className="mt-2 h-1.5 bg-hairline rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full ${usedPct > 85 ? 'bg-peach-deep' : 'bg-mint-deep'}`} style={{ width: `${Math.max(2, usedPct)}%` }} />
+                            </div>
+                          ) : (
+                            <div className="mt-2 h-1.5 bg-hairline rounded-full" title={lang === 'zh' ? '暂无额度明细' : 'No quota detail'} />
+                          )}
                           <div className="flex items-center justify-between mt-1.5 text-[10px] text-body">
-                            <span>{remaining} Credits</span>
+                            <span>{usedPct !== null && q ? `${q.remaining} / ${q.total} Credits` : acc.quota ? (lang === 'zh' ? `记录额度 ${acc.quota}` : `Recorded ${acc.quota}`) : '—'}</span>
                             <span>{acc.next_reset_at ? new Date(acc.next_reset_at).toLocaleDateString() : '—'}</span>
                           </div>
                         </div>
@@ -1124,19 +1176,42 @@ export default function App() {
                 <div className="card p-5">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-[10px] font-medium text-body uppercase tracking-wide">{lang === 'zh' ? '主套餐月度配额' : 'Plan quota'}</span>
-                    <span className="text-[10px] font-medium text-ink">{planUsedPct}%</span>
+                    <span className="text-[10px] font-medium text-ink">{planUsedPct !== null ? `${planUsedPct}%` : '—'}</span>
                   </div>
-                  <div className="flex items-baseline gap-1.5 mb-3">
-                    <span className="font-display-md text-ink leading-none">{planQuota.remaining}</span>
-                    <span className="text-[11px] text-body">/ {planQuota.total} Credits</span>
-                  </div>
-                  <div className="w-full bg-hairline h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-ink h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(2, planUsedPct)}%` }}></div>
-                  </div>
-                  <div className="flex justify-between mt-3 text-[10px] text-body">
-                    <span>{lang === 'zh' ? '已用' : 'Used'} {planQuota.used}</span>
-                    <span className="text-mint-deep font-medium">{lang === 'zh' ? '状态良好' : 'Healthy'}</span>
-                  </div>
+                  {planQuota ? (
+                    <>
+                      <div className="flex items-baseline gap-1.5 mb-3">
+                        <span className="font-display-md text-ink leading-none">{planQuota.remaining}</span>
+                        <span className="text-[11px] text-body">/ {planQuota.total} Credits</span>
+                      </div>
+                      <div className="w-full bg-hairline h-1.5 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all duration-500 ${planUsedPct !== null && planUsedPct >= 85 ? 'bg-peach-deep' : 'bg-ink'}`} style={{ width: `${Math.max(2, planUsedPct ?? 0)}%` }}></div>
+                      </div>
+                      <div className="flex justify-between mt-3 text-[10px] text-body">
+                        <span>{lang === 'zh' ? '已用' : 'Used'} {planQuota.used}</span>
+                        <span className={`font-medium ${planUsedPct !== null && planUsedPct >= 95 ? 'text-toast-error' : planUsedPct !== null && planUsedPct >= 85 ? 'text-peach-deep' : 'text-mint-deep'}`}>
+                          {planUsedPct === null ? '—' : planUsedPct >= 95 ? (lang === 'zh' ? '已耗尽' : 'Exhausted') : planUsedPct >= 85 ? (lang === 'zh' ? '即将耗尽' : 'Low') : (lang === 'zh' ? '充足' : 'Healthy')}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-1.5 mb-3">
+                        <span className="font-display-md text-body/30 leading-none">—</span>
+                        <span className="text-[11px] text-body">Credits</span>
+                      </div>
+                      <p className="text-[11px] text-body leading-relaxed">
+                        {accounts.length === 0
+                          ? (lang === 'zh' ? '尚未添加账号，无法读取配额。' : 'Add an account to read quota.')
+                          : (lang === 'zh' ? '配额接口暂不可用，请稍后刷新。' : 'Quota is unavailable, try refreshing.')}
+                      </p>
+                      <div className="flex justify-end mt-3">
+                        <button onClick={fetchUsageOverview} className="text-[10px] text-body hover:text-ink flex items-center gap-0.5 transition-colors">
+                          <span className="material-symbols-outlined text-[13px]">sync</span>{t.common.refresh}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="card p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -1144,22 +1219,29 @@ export default function App() {
                     <span className="text-[10px] font-medium text-peach-deep">{lang === 'zh' ? '30 天滚动' : '30-day'}</span>
                   </div>
                   <div className="flex items-baseline gap-1.5 mb-3">
-                    <span className="font-display-md text-peach-deep leading-none">{addOnQuota.remaining}</span>
+                    <span className="font-display-md text-peach-deep leading-none">{addOnQuota ? addOnQuota.remaining : '—'}</span>
                     <span className="text-[11px] text-body">Credits</span>
                   </div>
                   <p className="text-[11px] text-body leading-relaxed">
-                    {lang === 'zh' ? '每日签到赠送，优先级最高抵扣，持续打卡储备算力。' : 'Daily check-in rewards, highest priority deduction.'}
+                    {addOnQuota
+                      ? (lang === 'zh' ? '每日签到赠送，优先级最高抵扣，持续打卡储备算力。' : 'Daily check-in rewards, highest priority deduction.')
+                      : (lang === 'zh' ? '暂无数据。' : 'No data yet.')}
                   </p>
                 </div>
                 <div className="card p-5 flex flex-col justify-between">
                   <div>
                     <div className="text-[10px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '账号权限与有效期' : 'Account plan'}</div>
-                    <div className="text-sm font-medium text-ink">{userType === 'personal_professional_trial' ? (lang === 'zh' ? '个人专业试用版' : 'Pro Trial') : userType}</div>
-                    <div className="text-[11px] text-body mt-1.5">{lang === 'zh' ? '有效期至' : 'Valid until'} <span className="font-mono text-ink">{expiresAt}</span></div>
+                    <div className={`text-sm font-medium ${userType ? 'text-ink' : 'text-body/40'}`}>
+                      {userType
+                        ? (userType === 'personal_professional_trial' ? (lang === 'zh' ? '个人专业试用版' : 'Pro Trial') : userType)
+                        : '—'}
+                    </div>
+                    <div className="text-[11px] text-body mt-1.5">{lang === 'zh' ? '有效期至' : 'Valid until'} <span className="font-mono text-ink">{expiresAt || '—'}</span></div>
                   </div>
                   <div className="flex items-center justify-between pt-3 mt-3 border-t border-hairline">
-                    <span className="flex items-center gap-1 text-[10px] text-mint-deep font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-mint-deep"></span>{lang === 'zh' ? '正常轮转' : 'Active'}
+                    <span className={`flex items-center gap-1 text-[10px] font-medium ${userType ? 'text-mint-deep' : 'text-body/60'}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${userType ? 'bg-mint-deep' : 'bg-hairline-strong'}`}></span>
+                      {userType ? (lang === 'zh' ? '已连接' : 'Connected') : (lang === 'zh' ? '未连接' : 'Not connected')}
                     </span>
                     <button onClick={fetchUsageOverview} className="text-[10px] text-body hover:text-ink flex items-center gap-0.5 transition-colors">
                       <span className="material-symbols-outlined text-[13px]">sync</span>{t.common.refresh}
@@ -1214,29 +1296,35 @@ export default function App() {
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-[18px] text-body">hub</span>
                     <span className="text-sm font-medium text-ink">{t.nav.models}</span>
-                    <span className="text-[10px] text-body">{AVAILABLE_MODELS.length} {lang === 'zh' ? '款可用' : 'available'}</span>
+                    <span className="text-[10px] text-body">{models.length} {lang === 'zh' ? '款可用' : 'available'}</span>
                   </div>
                   <button onClick={() => setActiveTab('models')} className="text-[11px] text-body hover:text-ink flex items-center gap-0.5 transition-colors">
                     {lang === 'zh' ? '查看全部' : 'View all'}<span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                   </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {AVAILABLE_MODELS.slice(0, 6).map(m => (
-                    <button key={m.id} onClick={() => { navigator.clipboard.writeText(m.id); pushToast('SUCCESS', lang === 'zh' ? '已复制模型 ID' : 'Model ID copied', m.id) }}
-                      className="card-soft p-3 text-left hover:bg-hairline/50 transition-colors group">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="text-xs font-medium text-ink truncate">{m.name}</span>
-                        {m.free && <span className="px-1.5 py-0.5 bg-mint text-ink text-[9px] font-medium rounded-full shrink-0">FREE</span>}
-                      </div>
-                      <div className="text-[10px] text-body line-clamp-1 mb-2">{m.desc}</div>
-                      <div className="flex items-center gap-1.5 text-[9px]">
-                        <span className="px-1.5 py-0.5 bg-white border border-hairline rounded-full text-body font-mono">{m.context}</span>
-                        <span className="px-1.5 py-0.5 bg-lavender-soft text-ink rounded-full font-mono">{m.defaultEffort}</span>
-                        <span className="text-body ml-auto font-mono">{m.price}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                {models.length === 0 ? (
+                  <div className="py-8 text-center text-[11px] text-body">
+                    {modelsError ? (lang === 'zh' ? '模型列表加载失败' : 'Failed to load models') : (lang === 'zh' ? '加载中...' : 'Loading...')}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {models.slice(0, 6).map(m => (
+                      <button key={m.id} onClick={() => { navigator.clipboard.writeText(m.id); pushToast('SUCCESS', lang === 'zh' ? '已复制模型 ID' : 'Model ID copied', m.id) }}
+                        className="card-soft p-3 text-left hover:bg-hairline/50 transition-colors group">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-xs font-medium text-ink truncate">{m.name}</span>
+                          {m.free && <span className="px-1.5 py-0.5 bg-mint text-ink text-[9px] font-medium rounded-full shrink-0">FREE</span>}
+                        </div>
+                        <div className="text-[10px] text-body line-clamp-1 mb-2">{m.description}</div>
+                        <div className="flex items-center gap-1.5 text-[9px]">
+                          <span className="px-1.5 py-0.5 bg-white border border-hairline rounded-full text-body font-mono">{formatContext(m.contextLength)}</span>
+                          <span className="px-1.5 py-0.5 bg-lavender-soft text-ink rounded-full font-mono">{m.defaultEffort || '—'}</span>
+                          <span className="text-body ml-auto font-mono">{m.rate}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </section>
             </div>
           )}
@@ -1312,9 +1400,8 @@ export default function App() {
                       ) : filteredAccounts.map(acc => {
                         const isActive = accountsConfig.active_uid === acc.uid
                         const q = quotaByUid.get(acc.uid)?.quota?.userQuota
-                        const remaining = q ? q.remaining : acc.quota
-                        const total = q?.total || 300
-                        const pct = Math.min(100, Math.round(((q?.used || (total - remaining)) / total) * 100))
+                        const hasQuotaDetail = Boolean(q && q.total)
+                        const usedPct = hasQuotaDetail && q ? Math.min(100, Math.round((q.used / q.total) * 100)) : null
                         const expiresTs = acc.token_expires_at ? new Date(acc.token_expires_at).getTime() : 0
                         const daysLeft = expiresTs ? Math.max(0, (expiresTs - Date.now()) / 86400000) : null
                         const expiryPct = daysLeft !== null ? Math.min(100, Math.round((daysLeft / 7) * 100)) : 0
@@ -1349,12 +1436,24 @@ export default function App() {
                               )}
                             </td>
                             <td className="px-4 py-3.5">
-                              <div className="text-xs font-medium text-ink font-mono">{remaining}</div>
-                              <div className="w-24 mt-1.5">
-                                <ShareBar value={pct} max={100} color={pct > 85 ? 'bg-peach-deep' : 'bg-mint-deep'} />
-                              </div>
+                              {hasQuotaDetail && q ? (
+                                <>
+                                  <div className="text-xs font-medium text-ink font-mono">{q.remaining}</div>
+                                  <div className="w-24 mt-1.5">
+                                    <ShareBar value={usedPct ?? 0} max={100} color={(usedPct ?? 0) > 85 ? 'bg-peach-deep' : 'bg-mint-deep'} />
+                                  </div>
+                                  <div className="text-[9px] text-body mt-1">
+                                    {q.total} {lang === 'zh' ? '总额' : 'total'}
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className={`text-xs font-mono ${acc.quota ? 'text-ink' : 'text-body/40'}`}>{acc.quota || '—'}</div>
+                                  <div className="text-[9px] text-body mt-1">{lang === 'zh' ? '记录值 · 刷新积分获取明细' : 'Recorded · refresh for detail'}</div>
+                                </>
+                              )}
                               <div className="text-[9px] text-body mt-1">
-                                {acc.next_reset_at ? `${new Date(acc.next_reset_at).toLocaleDateString()} ${lang === 'zh' ? '重置' : 'reset'}` : '—'}
+                                {acc.next_reset_at ? `${new Date(acc.next_reset_at).toLocaleDateString()} ${lang === 'zh' ? '重置' : 'reset'}` : ''}
                               </div>
                             </td>
                             <td className="px-4 py-3.5">
@@ -1407,23 +1506,23 @@ export default function App() {
               <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="card p-4">
                   <div className="text-[10px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '可用模型' : 'Models'}</div>
-                  <div className="font-display-md text-ink leading-none">{AVAILABLE_MODELS.length}</div>
-                  <div className="text-[10px] text-body mt-1.5">{lang === 'zh' ? '全部已接入网关' : 'All routed by gateway'}</div>
+                  <div className="font-display-md text-ink leading-none">{models.length || '—'}</div>
+                  <div className="text-[10px] text-body mt-1.5">{lang === 'zh' ? '来源 GET /v1/models' : 'From GET /v1/models'}</div>
                 </div>
                 <div className="card p-4">
                   <div className="text-[10px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '支持推理' : 'Reasoning'}</div>
-                  <div className="font-display-md text-ink leading-none">{reasoningCount}</div>
+                  <div className="font-display-md text-ink leading-none">{models.length ? reasoningCount : '—'}</div>
                   <div className="text-[10px] text-body mt-1.5">{lang === 'zh' ? '可调 low → xhigh/max' : 'low → xhigh/max'}</div>
                 </div>
                 <div className="card p-4">
                   <div className="text-[10px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '最大上下文' : 'Max context'}</div>
-                  <div className="font-display-md text-ink leading-none">{maxContext >= 1000 ? '1M' : '200K'}</div>
-                  <div className="text-[10px] text-body mt-1.5">{lang === 'zh' ? '百万 Token 锁定' : 'Locked at 1M tokens'}</div>
+                  <div className="font-display-md text-ink leading-none">{maxContext ? (maxContext >= 1_000_000 ? '1M' : formatContext(maxContext)) : '—'}</div>
+                  <div className="text-[10px] text-body mt-1.5">{lang === 'zh' ? '按模型声明的上限' : 'Declared per model'}</div>
                 </div>
                 <div className="card p-4">
-                  <div className="text-[10px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '最大输出' : 'Max output'}</div>
-                  <div className="font-display-md text-ink leading-none">128K</div>
-                  <div className="text-[10px] text-body mt-1.5">{lang === 'zh' ? '单次回复上限' : 'Per response cap'}</div>
+                  <div className="text-[10px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '免费模型' : 'Free models'}</div>
+                  <div className="font-display-md text-mint-deep leading-none">{models.length ? freeCount : '—'}</div>
+                  <div className="text-[10px] text-body mt-1.5">{lang === 'zh' ? '0 倍率不计费' : 'Zero-rate, no charge'}</div>
                 </div>
               </section>
 
@@ -1434,10 +1533,10 @@ export default function App() {
                     className="w-full pl-9 pr-3 py-2 bg-canvas-soft border border-hairline rounded-full text-[11px] text-ink outline-none focus:border-hairline-strong transition-colors placeholder:text-body/50" />
                 </div>
                 <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar">
-                  {MODEL_SERIES.map(s => (
+                  {modelSeriesOptions.map(s => (
                     <button key={s} onClick={() => setModelSeries(s)}
                       className={`px-2.5 py-1.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors ${modelSeries === s ? 'bg-ink text-white' : 'bg-canvas-soft text-body hover:text-ink border border-hairline'}`}>
-                      {s === '全部' && lang === 'zh' ? '全部' : s}
+                      {s === '全部' && lang === 'zh' ? '全部' : s === '全部' ? 'All' : s}
                     </button>
                   ))}
                 </div>
@@ -1459,14 +1558,14 @@ export default function App() {
                   <table className="w-full text-left">
                     <thead>
                       <tr className="border-b border-hairline bg-canvas-soft">
-                        {[lang === 'zh' ? '模型' : 'Model', lang === 'zh' ? '上下文' : 'Context', lang === 'zh' ? '最大输出' : 'Max output', lang === 'zh' ? '推理档位' : 'Reasoning', lang === 'zh' ? '系列' : 'Series', lang === 'zh' ? '能力' : 'Capabilities', lang === 'zh' ? '倍率' : 'Rate'].map((h, i) => (
-                          <th key={i} className={`px-4 py-2.5 text-[9px] font-medium text-body uppercase tracking-wider ${i >= 6 ? 'text-right' : ''}`}>{h}</th>
+                        {[lang === 'zh' ? '模型' : 'Model', lang === 'zh' ? '上下文' : 'Context', lang === 'zh' ? '推理档位' : 'Reasoning', lang === 'zh' ? '系列' : 'Series', lang === 'zh' ? '能力' : 'Capabilities', lang === 'zh' ? '倍率' : 'Rate'].map((h, i) => (
+                          <th key={i} className={`px-4 py-2.5 text-[9px] font-medium text-body uppercase tracking-wider ${i >= 5 ? 'text-right' : ''}`}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-hairline">
                       {filteredModels.length === 0 ? (
-                        <tr><td colSpan={7} className="py-12 text-center text-xs text-body">{lang === 'zh' ? '没有匹配的模型' : 'No matching models'}</td></tr>
+                        <tr><td colSpan={6} className="py-12 text-center text-xs text-body">{modelsError ? (lang === 'zh' ? '模型列表加载失败' : 'Failed to load models') : (lang === 'zh' ? '没有匹配的模型' : 'No matching models')}</td></tr>
                       ) : filteredModels.map(m => (
                         <tr key={m.id} className="hover:bg-canvas-soft transition-colors group cursor-pointer" onClick={() => { navigator.clipboard.writeText(m.id); pushToast('SUCCESS', lang === 'zh' ? '已复制模型 ID' : 'Model ID copied', m.id) }}>
                           <td className="px-4 py-3">
@@ -1476,27 +1575,26 @@ export default function App() {
                             </div>
                             <div className="font-mono text-[9px] text-body mt-0.5">{m.id}</div>
                           </td>
-                          <td className="px-4 py-3 font-mono text-[10px] text-body whitespace-nowrap">{m.context}</td>
-                          <td className="px-4 py-3 font-mono text-[10px] text-body whitespace-nowrap">{m.maxOutput}</td>
+                          <td className="px-4 py-3 font-mono text-[10px] text-body whitespace-nowrap">{formatContext(m.contextLength)}</td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap items-center gap-1">
-                              {m.efforts.map(e => (
+                              {m.efforts.length === 0 ? <span className="text-[10px] text-body">—</span> : m.efforts.map(e => (
                                 <span key={e} className={`px-1.5 py-0.5 rounded-full text-[9px] font-mono ${e === m.defaultEffort ? 'bg-ink text-white' : 'bg-canvas-soft text-body border border-hairline'}`}>{e}</span>
                               ))}
                               {m.efforts.length > 1 && <span className="text-[8px] text-body/60 ml-0.5">{lang === 'zh' ? '默认' : 'default'}</span>}
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-medium bg-lavender-soft text-ink">{m.series}</span>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-medium bg-lavender-soft text-ink">{m.series || '—'}</span>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-1">
-                              {m.caps.map(c => (
+                              {m.capabilities.length === 0 ? <span className="text-[10px] text-body">—</span> : m.capabilities.map(c => (
                                 <span key={c} className={`px-1.5 py-0.5 rounded-full text-[9px] ${c === '仅推理' ? 'bg-sky-soft text-sky-deep' : c === '智能路由' ? 'bg-peach-soft text-peach-deep' : 'bg-canvas-soft text-body border border-hairline'}`}>{c}</span>
                               ))}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right font-mono text-[10px] text-ink">{m.price}</td>
+                          <td className="px-4 py-3 text-right font-mono text-[10px] text-ink">{m.rate || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1627,9 +1725,10 @@ export default function App() {
               <aside className="w-full lg:w-[260px] flex flex-col gap-3 shrink-0">
                 <div className="card p-4">
                   <label className="text-[10px] font-medium text-body uppercase tracking-wide block mb-2">{t.playground.modelConfig}</label>
-                  <select value={model} onChange={e => setModel(e.target.value)}
-                    className="w-full px-3 py-2 bg-canvas-soft border border-hairline rounded-lg text-xs text-ink outline-none focus:border-hairline-strong transition-colors cursor-pointer">
-                    {AVAILABLE_MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  <select value={model} onChange={e => setModel(e.target.value)} disabled={models.length === 0}
+                    className="w-full px-3 py-2 bg-canvas-soft border border-hairline rounded-lg text-xs text-ink outline-none focus:border-hairline-strong transition-colors cursor-pointer disabled:opacity-50">
+                    {models.length === 0 && <option value="">{modelsError ? (lang === 'zh' ? '模型加载失败' : 'Failed to load') : (lang === 'zh' ? '加载中...' : 'Loading...')}</option>}
+                    {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                   <div className="text-[10px] text-body mt-1.5 font-mono truncate">{model}</div>
                 </div>
