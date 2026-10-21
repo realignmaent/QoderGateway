@@ -41,6 +41,7 @@ from .campaigns import (
     get_all_raw_accounts,
 )
 from .usage import estimate_tokens, get_usage_stats, record_usage
+from .models import openai_model_list
 
 
 BASE_DIR = os.path.dirname(__file__)
@@ -569,21 +570,8 @@ async def chat_completions(payload: dict[str, Any], authorization: str | None = 
 
 @app.get("/v1/models")
 async def list_models():
-    """标准 OpenAI 模型列表端点，供 CherryStudio / NextChat / OpenWebUI 等客户端自动拉取。"""
-    models_list = [
-        {"id": "auto", "object": "model", "owned_by": "qoder", "display_name": "Auto (智能路由 200K)", "context_length": 200000},
-        {"id": "qwen3.8-max", "object": "model", "owned_by": "alibaba", "display_name": "Qwen3.8-Max (通义旗舰思考 1M)", "context_length": 1000000},
-        {"id": "qwen3.8-flash", "object": "model", "owned_by": "alibaba", "display_name": "Qwen3.8-Flash (极速思考·免费 1M)", "context_length": 1000000},
-        {"id": "qwen3.7-plus", "object": "model", "owned_by": "alibaba", "display_name": "Qwen3.7-Plus (通用低倍率 1M)", "context_length": 1000000},
-        {"id": "deepseek-v4-pro", "object": "model", "owned_by": "deepseek", "display_name": "DeepSeek-V4-Pro (深度推理 1M)", "context_length": 1000000},
-        {"id": "deepseek-flash", "object": "model", "owned_by": "deepseek", "display_name": "DeepSeek-Flash (极速·免费 1M)", "context_length": 1000000},
-        {"id": "glm-5.3", "object": "model", "owned_by": "zhipu", "display_name": "GLM-5.3 (智谱推理旗舰 1M)", "context_length": 1000000},
-        {"id": "glm-5.3-flash", "object": "model", "owned_by": "zhipu", "display_name": "GLM-5.3-Flash (1M超长上下文)", "context_length": 1000000},
-        {"id": "kimi-k3", "object": "model", "owned_by": "moonshot", "display_name": "Kimi-K3 (长程旗舰 1M)", "context_length": 1000000},
-        {"id": "kimi-k2.8", "object": "model", "owned_by": "moonshot", "display_name": "Kimi-K2.8-Preview (代码专家 1M)", "context_length": 1000000},
-        {"id": "minimax-m3.1-flash", "object": "model", "owned_by": "minimax", "display_name": "MiniMax-M3.1-Flash (极速文本 200K)", "context_length": 200000},
-    ]
-    return {"object": "list", "data": models_list}
+    """标准 OpenAI 模型列表端点，附带动网关侧元数据（系列/推理档位/能力/倍率）。"""
+    return {"object": "list", "data": openai_model_list()}
 
 
 
