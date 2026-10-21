@@ -1,5 +1,6 @@
 import argparse
 import collections
+import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -39,6 +40,7 @@ from .campaigns import (
     start_auto_claim_loop,
     get_all_raw_accounts,
 )
+from .usage import estimate_tokens, get_usage_stats, record_usage
 
 
 BASE_DIR = os.path.dirname(__file__)
@@ -64,6 +66,25 @@ def add_log(msg: str, level: str = "INFO") -> None:
 
 # Add initial logs
 add_log("Qoder2API Python Bridge initialized.")
+
+
+def _count_stream_delta_chars(chunk: str) -> int:
+    total = 0
+    for line in chunk.splitlines():
+        if not line.startswith("data:"):
+            continue
+        data = line[5:].strip()
+        if not data or data == "[DONE]":
+            continue
+        try:
+            obj = json.loads(data)
+        except Exception:
+            continue
+        for choice in obj.get("choices") or []:
+            delta = choice.get("delta") or {}
+            total += len(delta.get("content") or "")
+            total += len(delta.get("reasoning_content") or "")
+    return total
 
 
 
@@ -303,6 +324,13 @@ async def usage_overview(verify: None = Depends(check_gateway_token)) -> dict[st
 
 
 
+@app.get("/ui/usage/stats")
+async def usage_stats(days: int = 14, verify: None = Depends(check_gateway_token)) -> dict[str, Any]:
+    """请求用量统计（请求数为精确值，token 为估算值）。"""
+    return get_usage_stats(days=max(1, min(60, days)))
+
+
+
 @app.delete("/ui/accounts/{uid}")
 async def delete_account(uid: str, verify: None = Depends(check_gateway_token)) -> dict[str, Any]:
     with get_db() as conn:
@@ -435,12 +463,12 @@ def is_account_error(exc: Exception) -> bool:
 @app.post("/v1/chat/completions")
 async def chat_completions(payload: dict[str, Any], authorization: str | None = Header(default=None)):
     config = load_config()
+    incoming_key = None
+    if authorization and authorization.startswith("Bearer "):
+        incoming_key = authorization[len("Bearer "):].strip()
+
     if config.get("auth_required", False):
         allowed_keys = config.get("allowed_keys", [])
-        incoming_key = None
-        if authorization and authorization.startswith("Bearer "):
-            incoming_key = authorization[len("Bearer "):].strip()
-        
         if not incoming_key or incoming_key not in allowed_keys:
             add_log("Access denied: Invalid or missing API Key in request header.", "WARNING")
             raise HTTPException(status_code=401, detail="Invalid or missing API Key")
@@ -449,6 +477,11 @@ async def chat_completions(payload: dict[str, Any], authorization: str | None = 
     stream = bool(payload.get("stream", False))
     messages_count = len(payload.get("messages", []))
     add_log(f"Incoming completion request: model={model}, stream={stream}, messages={messages_count}")
+
+    prompt_text = "".join(
+        str(m.get("content") or "") for m in payload.get("messages", []) if isinstance(m, dict)
+    )
+    prompt_tokens = estimate_tokens(prompt_text)
     
     accounts_data = db_load_accounts()
     enabled_count = sum(1 for acc in accounts_data["accounts"] if acc.get("enabled", True))
@@ -464,13 +497,25 @@ async def chat_completions(payload: dict[str, Any], authorization: str | None = 
                     first_item = await gen.__anext__()
                 except StopAsyncIteration:
                     first_item = None
-                
+
+                sess_uid = sess.identity.uid
+                sess_name = sess.identity.name
+
                 async def stream_success_wrapper(first, g):
-                    if first is not None:
-                        yield first
-                    async for chunk in g:
-                        yield chunk
-                
+                    completion_chars = 0
+                    try:
+                        if first is not None:
+                            completion_chars += _count_stream_delta_chars(first)
+                            yield first
+                        async for chunk in g:
+                            completion_chars += _count_stream_delta_chars(chunk)
+                            yield chunk
+                    finally:
+                        record_usage(
+                            model, sess_uid, sess_name, incoming_key,
+                            prompt_tokens, max(0, completion_chars // 2), "ok",
+                        )
+
                 add_log(f"Streaming response initiated (Attempt {attempt+1}/{max_retries}).")
                 return StreamingResponse(
                     stream_success_wrapper(first_item, gen),
@@ -480,6 +525,15 @@ async def chat_completions(payload: dict[str, Any], authorization: str | None = 
             else:
                 add_log(f"Generating full completion response (Attempt {attempt+1}/{max_retries})...")
                 resp = await complete_openai_response(payload, sess)
+                try:
+                    msg = (resp.get("choices") or [{}])[0].get("message") or {}
+                    completion_text = str(msg.get("content") or "") + str(msg.get("reasoning_content") or "")
+                    record_usage(
+                        model, sess.identity.uid, sess.identity.name, incoming_key,
+                        prompt_tokens, estimate_tokens(completion_text), "ok",
+                    )
+                except Exception:
+                    pass
                 add_log("Completion request finished successfully.")
                 return resp
         except Exception as exc:

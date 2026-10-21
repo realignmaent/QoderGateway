@@ -77,5 +77,24 @@ def init_db():
         except Exception:
             pass
 
+        # 请求用量事件表（token 数为估算值）
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS usage_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts INTEGER NOT NULL,
+                model TEXT,
+                account_uid TEXT,
+                account_name TEXT,
+                api_key TEXT,
+                prompt_tokens INTEGER DEFAULT 0,
+                completion_tokens INTEGER DEFAULT 0,
+                total_tokens INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'ok'
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage_events(ts)")
+
 
 init_db()
