@@ -1221,14 +1221,17 @@ export default function App() {
                     )}
                     {accounts.map(acc => {
                       const isActiveAcc = acc.uid === accountsConfig.active_uid
-                      const perAccount = quotaByUid.get(acc.uid)?.quota?.userQuota
+                      const quotaEntry = quotaByUid.get(acc.uid)?.quota
+                      const perAccount = quotaEntry?.userQuota
+                      const perAddOn = quotaEntry?.addOnQuota
                       const baseQ = perAccount && perAccount.total ? perAccount : (isActiveAcc ? planQuota : null)
+                      const extraQ = perAddOn && perAddOn.total ? perAddOn : (isActiveAcc ? addOnQuota : null)
                       const q = baseQ
-                        ? (isActiveAcc && addOnQuota
+                        ? (extraQ
                             ? {
-                                total: (baseQ.total || 0) + (addOnQuota.total || 0),
-                                used: (baseQ.used || 0) + (addOnQuota.used || 0),
-                                remaining: (baseQ.remaining || 0) + (addOnQuota.remaining || 0),
+                                total: (baseQ.total || 0) + (extraQ.total || 0),
+                                used: (baseQ.used || 0) + (extraQ.used || 0),
+                                remaining: (baseQ.remaining || 0) + (extraQ.remaining || 0),
                               }
                             : baseQ)
                         : null
@@ -1425,14 +1428,17 @@ export default function App() {
                         <tr><td colSpan={7} className="py-12 text-center text-xs text-body">{t.accounts.empty}</td></tr>
                       ) : filteredAccounts.map(acc => {
                         const isActive = accountsConfig.active_uid === acc.uid
-                        const perAccount = quotaByUid.get(acc.uid)?.quota?.userQuota
+                        const quotaEntry = quotaByUid.get(acc.uid)?.quota
+                        const perAccount = quotaEntry?.userQuota
+                        const perAddOn = quotaEntry?.addOnQuota
                         const baseQ = perAccount && perAccount.total ? perAccount : (isActive ? planQuota : null)
+                        const extraQ = perAddOn && perAddOn.total ? perAddOn : (isActive ? addOnQuota : null)
                         const q = baseQ
-                          ? (isActive && addOnQuota
+                          ? (extraQ
                               ? {
-                                  total: (baseQ.total || 0) + (addOnQuota.total || 0),
-                                  used: (baseQ.used || 0) + (addOnQuota.used || 0),
-                                  remaining: (baseQ.remaining || 0) + (addOnQuota.remaining || 0),
+                                  total: (baseQ.total || 0) + (extraQ.total || 0),
+                                  used: (baseQ.used || 0) + (extraQ.used || 0),
+                                  remaining: (baseQ.remaining || 0) + (extraQ.remaining || 0),
                                 }
                               : baseQ)
                           : null
