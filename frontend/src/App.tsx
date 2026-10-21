@@ -1,3 +1,18 @@
+
+const AVAILABLE_MODELS = [
+  { id: 'auto', name: 'Auto', provider: 'Qoder', desc: '平台智能动态路由 (自适应最适底座)', context: '200K', price: '0.5x', tag: '智能路由', effort: '自适应', free: false },
+  { id: 'qwen3.8-max', name: 'Qwen3.8-Max', provider: '阿里通义', desc: '通义顶配旗舰思考大模型 (强逻辑/代码)', context: '1000K (1M)', price: '0.5x', tag: '通义旗舰', effort: 'xhigh', free: false },
+  { id: 'qwen3.8-flash', name: 'Qwen3.8-Flash', provider: '阿里通义', desc: '极速思考模型·高频日常调用推荐', context: '1000K (1M)', price: '0.0x', tag: '免费高频', effort: 'xhigh', free: true },
+  { id: 'qwen3.7-plus', name: 'Qwen3.7-Plus', provider: '阿里通义', desc: '全功能通用超低倍率模型', context: '1000K (1M)', price: '0.1x', tag: '超低消耗', effort: '可开/关', free: false },
+  { id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', provider: 'DeepSeek', desc: '深度求索极致推理大模型 (复杂算法与数学)', context: '1000K (1M)', price: '0.5x', tag: '深度推理', effort: 'max', free: false },
+  { id: 'deepseek-flash', name: 'DeepSeek-Flash', provider: 'DeepSeek', desc: '深度求索极速·不限额度免费调用', context: '1000K (1M)', price: '0.0x', tag: '免费极速', effort: 'max', free: true },
+  { id: 'glm-5.3', name: 'GLM-5.3', provider: '智谱 AI', desc: '智谱AI新一代推理旗舰 (中文深度对齐)', context: '1000K (1M)', price: '0.8x', tag: '智谱旗舰', effort: 'max', free: false },
+  { id: 'glm-5.3-flash', name: 'GLM-5.3-Flash', provider: '智谱 AI', desc: '原生百万长文本分析专家 (文档/长代码)', context: '1000K (1M)', price: '0.1x', tag: '1M长文本', effort: 'max', free: false },
+  { id: 'kimi-k3', name: 'Kimi-K3', provider: '月之暗面', desc: '月之暗面长程旗舰推理 (长程推演与学术)', context: '1000K (1M)', price: '1.4x', tag: '长程推演', effort: 'max', free: false },
+  { id: 'kimi-k2.8', name: 'Kimi-K2.8-Preview', provider: '月之暗面', desc: '代码架构与工程推演专家', context: '1000K (1M)', price: '0.8x', tag: '代码专家', effort: 'max', free: false },
+  { id: 'minimax-m3.1-flash', name: 'MiniMax-M3.1-Flash', provider: 'MiniMax', desc: '超低延迟极速文本与对话', context: '200K', price: '0.1x', tag: '极速文本', effort: '纯文本', free: false },
+]
+
 import React, { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -338,6 +353,8 @@ export default function App() {
   const [patToken, setPatToken] = useState('')
   const [submittingPat, setSubmittingPat] = useState(false)
   const [searchAccounts, setSearchAccounts] = useState('')
+  const [usageData, setUsageData] = useState<any>(null)
+  const [claiming, setClaiming] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
 
   const [showBatchImport, setShowBatchImport] = useState(false)
@@ -444,6 +461,33 @@ export default function App() {
   const fetchAccounts = useCallback(async () => {
     try { const resp = await authedFetch('/ui/accounts'); const data = await resp.json(); setAccountsConfig(data) } catch { /* */ }
   }, [authedFetch])
+  const fetchUsageOverview = useCallback(async () => {
+    try {
+      const resp = await authedFetch('/ui/usage-overview')
+      const data = await resp.json()
+      if (data.ok) setUsageData(data)
+    } catch { /* */ }
+  }, [authedFetch])
+
+  const handleClaimDaily = async () => {
+    setClaiming(true)
+    try {
+      const resp = await authedFetch('/ui/claim', { method: 'POST', body: JSON.stringify({}) })
+      const data = await resp.json()
+      if (data.ok) {
+        const msgStr = data.results?.map((r: any) => `${r.name}: ${r.message}`).join('\n') || (lang === 'zh' ? '签到打卡完成！' : 'Check-in completed!')
+        pushToast('SUCCESS', lang === 'zh' ? '每日签到' : 'Daily Check-in', msgStr)
+        fetchUsageOverview()
+      } else {
+        pushToast('ERROR', lang === 'zh' ? '签到失败' : 'Failed', data.error || '')
+      }
+    } catch (e: any) {
+      pushToast('ERROR', 'Error', e.message)
+    } finally {
+      setClaiming(false)
+    }
+  }
+
   const fetchApiConfig = useCallback(async () => {
     try { const resp = await authedFetch('/ui/config'); const data = await resp.json(); setApiConfig(data) } catch { /* */ }
   }, [authedFetch])
@@ -524,7 +568,7 @@ export default function App() {
 
   useEffect(() => {
     if (!token) return
-    fetchStatus(); fetchAccounts(); fetchApiConfig(); fetchLogs(); fetchRegStatus()
+    fetchStatus(); fetchAccounts(); fetchApiConfig(); fetchUsageOverview(); fetchLogs(); fetchRegStatus()
     const si = setInterval(fetchStatus, 6000)
     const li = setInterval(() => { if (activeTab === 'logs') fetchLogs() }, 3000)
     const ri = setInterval(() => { if (activeTab === 'register' && regStatus?.running) fetchRegStatus() }, 2000)
@@ -897,6 +941,7 @@ export default function App() {
           {/* ─── DASHBOARD ─── */}
           {activeTab === 'dashboard' && (
             <div className="space-y-8">
+              {/* 基础统计卡片 */}
               <section ref={statCardsRef} className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {[
                   { label: t.dashboard.serviceStatus, value: status.ready ? t.common.healthy : t.common.offline, detail: status.ready ? t.dashboard.allGatewaysActive : t.dashboard.noActiveSession, dot: status.ready ? 'bg-mint' : 'bg-red-400' },
@@ -912,34 +957,244 @@ export default function App() {
                 ))}
               </section>
 
-              <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-                <div className="lg:col-span-2 glass-card p-8 rounded-2xl flex flex-col">
-                  <div className="text-[12px] font-semibold text-body mb-2 uppercase tracking-widest">{t.dashboard.systemBriefing}</div>
-                  <div className="font-display-md text-ink mb-4 max-w-lg">{status.ready ? t.dashboard.readyBrief.replace('{count}', String(status.accounts_count)) : t.dashboard.notReadyBrief}</div>
-                  <div className="mt-auto bg-ink/5 p-4 rounded-lg border border-hairline-strong" ref={terminalRef}>
-                    <code className="text-sm font-mono text-ink">
-                      <span className="text-primary font-bold">system@qodergate:~$</span> status --check --all<br />
-                      <span className="term-line opacity-70">Checking nodes... [{status.ready ? 'OK' : 'FAIL'}]<br /></span>
-                      <span className="term-line opacity-70">Validating certificates... [OK]<br /></span>
-                      <span className="term-line opacity-70">Routing traffic to nearest node...</span><span className="cursor-blink">_</span>
-                    </code>
+              {/* 每日签到与福利胶囊 (Daily Check-in Banner) */}
+              {(() => {
+                const campaigns = usageData?.campaigns?.campaigns || []
+                const targetC = campaigns.find((c: any) => c.actionType === 'CLAIM_BENEFIT') || campaigns[0]
+                const isClaimed = targetC?.claimStatus === 'CLAIMED'
+                return (
+                  <section className="bg-gradient-to-r from-amber-500/10 via-primary/5 to-transparent border border-amber-500/20 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 shrink-0">
+                        <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>card_giftcard</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-display-sm text-ink font-bold">每日签到福利 (Daily Check-in)</span>
+                          {isClaimed ? (
+                            <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-mint/15 text-mint border border-mint/30 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[14px]">check</span> 今日已领 100 Credits
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-amber-500/20 text-amber-600 border border-amber-500/40 animate-pulse">
+                              今日未签到 · 待领取
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-body text-xs mt-1">
+                          每日领取 100 通用算力额度（30天有效，每日 10:00 UTC+8 自动重置刷新）。后台守护每日 10:05 亦会自动巡检打卡。
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
+                      <button
+                        onClick={handleClaimDaily}
+                        disabled={claiming || isClaimed}
+                        className={`w-full md:w-auto px-6 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+                          isClaimed
+                            ? 'bg-ink/10 text-body cursor-not-allowed border border-hairline'
+                            : 'bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20 active:scale-95'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">verified</span>
+                        {claiming ? '领取中...' : isClaimed ? '今日已打卡' : '立即打卡领 100 Credits'}
+                      </button>
+                    </div>
+                  </section>
+                )
+              })()}
+
+              {/* 用量与额度分析三栏 (Usage Analytics) */}
+              {(() => {
+                const uq = usageData?.quota?.userQuota || { total: 300, used: 1, remaining: 299, percentage: 0.01 }
+                const addOn = usageData?.quota?.addOnQuota || { total: 100, remaining: 100, used: 0 }
+                const expiresAt = usageData?.quota?.expiresAt ? new Date(usageData.quota.expiresAt).toLocaleDateString('zh-CN') : '2026/11/20'
+                const userType = usageData?.quota?.userType || 'personal_professional_trial'
+                const usedPct = Math.min(100, Math.round(((uq.used || 0) / (uq.total || 300)) * 100))
+
+                return (
+                  <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* 主套餐配额 */}
+                    <div className="bg-surface-card border border-hairline p-6 rounded-2xl flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between text-body text-xs font-semibold uppercase tracking-wider mb-2">
+                          <span>主套餐月度配额 (Plan Quota)</span>
+                          <span className="text-primary font-bold">{usedPct}% 已用</span>
+                        </div>
+                        <div className="flex items-baseline gap-2 mb-3">
+                          <span className="font-display-md text-ink font-bold">{uq.remaining}</span>
+                          <span className="text-body text-xs font-medium">/ {uq.total} Credits 剩余</span>
+                        </div>
+                        <div className="w-full bg-ink/10 h-2.5 rounded-full overflow-hidden">
+                          <div className="bg-primary h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(4, usedPct)}%` }}></div>
+                        </div>
+                      </div>
+                      <div className="text-[12px] text-body mt-4 pt-3 border-t border-hairline flex justify-between">
+                        <span>已消耗：{uq.used} Credits</span>
+                        <span className="text-mint font-semibold">状态良好</span>
+                      </div>
+                    </div>
+
+                    {/* 每日签到算力池 */}
+                    <div className="bg-surface-card border border-hairline p-6 rounded-2xl flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between text-body text-xs font-semibold uppercase tracking-wider mb-2">
+                          <span>通用签到算力 (Add-on Credits)</span>
+                          <span className="text-amber-500 font-bold">30 天滚动</span>
+                        </div>
+                        <div className="flex items-baseline gap-2 mb-3">
+                          <span className="font-display-md text-amber-600 font-bold">{addOn.remaining}</span>
+                          <span className="text-body text-xs font-medium">Credits 算力在池</span>
+                        </div>
+                        <div className="text-xs text-body leading-relaxed">
+                          每日签到赠送的独立算力池，优先级最高抵扣。每日持续打卡即可源源不断储备算力。
+                        </div>
+                      </div>
+                      <div className="text-[12px] text-body mt-4 pt-3 border-t border-hairline flex justify-between">
+                        <span>通用全模型抵扣</span>
+                        <span className="text-amber-600 font-semibold">有效累计中</span>
+                      </div>
+                    </div>
+
+                    {/* 账号生命周期与类型 */}
+                    <div className="bg-surface-card border border-hairline p-6 rounded-2xl flex flex-col justify-between">
+                      <div>
+                        <div className="text-body text-xs font-semibold uppercase tracking-wider mb-2">
+                          账号权限与有效期 (Account Plan)
+                        </div>
+                        <div className="font-display-sm text-ink font-bold mb-1">
+                          {userType === 'personal_professional_trial' ? '个人专业试用版' : userType}
+                        </div>
+                        <div className="text-xs text-body leading-relaxed mt-2">
+                          当前有效期至：<span className="font-mono font-bold text-ink">{expiresAt}</span>
+                        </div>
+                      </div>
+                      <div className="text-[12px] text-body mt-4 pt-3 border-t border-hairline flex justify-between items-center">
+                        <span className="text-mint flex items-center gap-1 font-semibold">
+                          <span className="h-2 w-2 rounded-full bg-mint"></span> 正常轮转中
+                        </span>
+                        <button onClick={fetchUsageOverview} className="text-xs text-primary hover:underline font-semibold flex items-center gap-0.5">
+                          <span className="material-symbols-outlined text-[14px]">sync</span> 刷新用量
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                )
+              })()}
+
+              {/* 客户端极简连接向导 (CC-Switch / CherryStudio / NextChat) */}
+              <section className="bg-surface-card border border-hairline p-6 rounded-2xl">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-hairline">
+                  <div>
+                    <div className="text-xs font-semibold text-primary uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">devices</span> 客户端极简接入向导 (Client Integration)
+                    </div>
+                    <div className="text-sm font-bold text-ink">
+                      支持 cc-switch、CherryStudio、NextChat、Claude Code、Cursor 开箱即用
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="px-3 py-1 bg-mint/10 text-mint text-xs font-bold rounded-lg border border-mint/20 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">bolt</span> 100万Token (1M) 极限上下文已就绪
+                    </span>
+                    <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-lg border border-primary/20 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">psychology</span> 默认最高思考强度 (xhigh / max)
+                    </span>
                   </div>
                 </div>
-                <div className="bg-surface-card border border-hairline p-8 rounded-2xl">
-                  <div className="text-[12px] font-semibold text-body mb-6 uppercase tracking-widest">{t.dashboard.recentNotifications}</div>
-                  <ul ref={notifListRef} className="space-y-4">
-                    {status.error ? (
-                      <li className="flex items-start gap-4"><span className="material-symbols-outlined text-peach">warning</span><div><div className="font-bold text-[16px]">{t.dashboard.authImportError}</div><div className="text-[12px] text-body break-all">{status.error}</div></div></li>
-                    ) : (
-                      <>
-                        <li className="flex items-start gap-4"><span className="material-symbols-outlined text-sky">info</span><div><div className="font-bold text-[16px]">{t.dashboard.apiAuth}</div><div className="text-[12px] text-body">{apiConfig.auth_required ? (lang === 'zh' ? '外部请求需要 API Key' : 'External requests require API keys') : t.dashboard.openAccess}</div></div></li>
-                        <li className="flex items-start gap-4"><span className="material-symbols-outlined text-mint">check_circle</span><div><div className="font-bold text-[16px]">{t.dashboard.sessionActive}</div><div className="text-[12px] text-body">{status.username || (lang === 'zh' ? '暂无账号' : 'No account')}</div></div></li>
-                      </>
-                    )}
-                  </ul>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div className="bg-canvas-soft p-4 rounded-xl border border-hairline flex items-center justify-between">
+                    <div className="min-w-0 pr-3">
+                      <div className="text-[11px] font-bold text-body uppercase tracking-wider">API Base URL (端点地址)</div>
+                      <div className="text-sm font-mono font-bold text-ink truncate mt-0.5">http://192.168.31.172:5050/v1</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText('http://192.168.31.172:5050/v1')
+                        pushToast('SUCCESS', '已复制 Base URL', 'http://192.168.31.172:5050/v1')
+                      }}
+                      className="px-3 py-1.5 bg-white border border-hairline rounded-lg text-xs font-bold text-ink hover:bg-ink hover:text-white transition-all shrink-0 flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">content_copy</span> 复制
+                    </button>
+                  </div>
+
+                  <div className="bg-canvas-soft p-4 rounded-xl border border-hairline flex items-center justify-between">
+                    <div className="min-w-0 pr-3">
+                      <div className="text-[11px] font-bold text-body uppercase tracking-wider">Gateway API Key (授权密钥)</div>
+                      <div className="text-sm font-mono font-bold text-ink truncate mt-0.5">
+                        {apiConfig.allowed_keys[0] || 'qg_live_ecebc5191dfda64a659f8be78cd5db00'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const key = apiConfig.allowed_keys[0] || 'qg_live_ecebc5191dfda64a659f8be78cd5db00'
+                        navigator.clipboard.writeText(key)
+                        pushToast('SUCCESS', '已复制 API Key', key)
+                      }}
+                      className="px-3 py-1.5 bg-white border border-hairline rounded-lg text-xs font-bold text-ink hover:bg-ink hover:text-white transition-all shrink-0 flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">content_copy</span> 复制
+                    </button>
+                  </div>
                 </div>
               </section>
 
+              {/* 大模型矩阵全景实验室 (11 款大模型) */}
+              <section className="bg-surface-card border border-hairline p-6 rounded-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <div className="text-xs font-semibold text-body uppercase tracking-widest mb-1">
+                      大模型矩阵全景看板 (Model Matrix Hub)
+                    </div>
+                    <div className="text-sm font-bold text-ink">
+                      当前支持 11 款大模型，均已放开 1M 上下文与极致推理档位，点击可复制模型 ID
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-body bg-canvas-soft px-3 py-1.5 rounded-lg border border-hairline">
+                    共 11 个可用模型
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {AVAILABLE_MODELS.map(m => (
+                    <div
+                      key={m.id}
+                      onClick={() => {
+                        navigator.clipboard.writeText(m.id)
+                        pushToast('SUCCESS', '已复制模型 ID', m.id)
+                      }}
+                      className="group p-4 bg-canvas-soft hover:bg-white border border-hairline hover:border-primary/40 rounded-xl transition-all cursor-pointer relative hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-ink group-hover:text-primary transition-colors">{m.name}</span>
+                            {m.free && (
+                              <span className="px-1.5 py-0.5 bg-mint/20 text-mint text-[10px] font-bold rounded">
+                                0扣费
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-body mt-0.5">{m.desc}</div>
+                        </div>
+                        <span className="material-symbols-outlined text-body/30 group-hover:text-primary text-[18px] transition-colors shrink-0">
+                          content_copy
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-hairline/60 text-[11px] font-mono">
+                        <span className="px-2 py-0.5 rounded bg-ink/5 text-ink font-semibold">{m.context}</span>
+                        <span className="px-2 py-0.5 rounded bg-primary/10 text-primary font-bold">思考: {m.effort}</span>
+                        <span className="text-body ml-auto">{m.price}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* 凭据导入管理 */}
               <section className="bg-surface-card border border-hairline p-8 rounded-2xl">
                 <div className="text-[12px] font-semibold text-body mb-2 uppercase tracking-widest">{t.dashboard.credentialConfig}</div>
                 <p className="text-body text-[16px] mb-6">{t.dashboard.credentialDesc}</p>
