@@ -408,6 +408,10 @@ export default function App() {
   const [claiming, setClaiming] = useState(false)
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null)
   const [models, setModels] = useState<ModelInfo[]>([])
+  const [deviceFlow, setDeviceFlow] = useState<{ flow_id: string; auth_url: string } | null>(null)
+  const [deviceStatus, setDeviceStatus] = useState<'idle' | 'pending' | 'success' | 'error' | 'expired'>('idle')
+  const [deviceError, setDeviceError] = useState<string | null>(null)
+  const [deviceRemaining, setDeviceRemaining] = useState(0)
   const [modelsError, setModelsError] = useState(false)
 
   const [modelSeries, setModelSeries] = useState('全部')
@@ -657,6 +661,33 @@ export default function App() {
   useEffect(() => { if (activeTab === 'logs') logEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [logs, activeTab])
   useEffect(() => { if (activeTab === 'playground') chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages, activeTab])
 
+  useEffect(() => {
+    if (!deviceFlow || deviceStatus !== 'pending') return
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const resp = await authedFetch(`/ui/accounts/device/status?flow_id=${deviceFlow.flow_id}`)
+        const data = await resp.json()
+        if (cancelled) return
+        if (typeof data.remaining === 'number') setDeviceRemaining(data.remaining)
+        if (data.status === 'success') {
+          setDeviceStatus('success')
+          pushToast('SUCCESS', lang === 'zh' ? '账号已添加' : 'Account added', data.account?.name || '')
+          setShowAddAccount(false)
+          setShowBatchImport(false)
+          setDeviceFlow(null)
+          setDeviceStatus('idle')
+          fetchAccounts(); fetchStatus(); fetchUsageOverview(); loadQuota()
+        } else if (data.status === 'error' || data.status === 'expired') {
+          setDeviceStatus(data.status)
+          setDeviceError(data.error || '')
+        }
+      } catch { /* keep polling */ }
+    }
+    const timer = setInterval(tick, 2000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [deviceFlow, deviceStatus, authedFetch, lang, pushToast, fetchAccounts, fetchStatus, fetchUsageOverview, loadQuota])
+
   // GSAP
   useEffect(() => { if (!token && loginCardRef.current) gsap.fromTo(loginCardRef.current, { scale: 0.94, opacity: 0, y: 20 }, { scale: 1, opacity: 1, y: 0, duration: 0.55, ease: 'power2.out' }) }, [token])
   useEffect(() => { if (token && contentBodyRef.current) gsap.fromTo(contentBodyRef.current, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.32, ease: 'power2.out' }) }, [activeTab, token])
@@ -699,8 +730,40 @@ export default function App() {
       setShowAddAccount(false)
       fetchAccounts(); fetchStatus(); fetchLogs(); loadQuota()
     } catch (err: any) {
-      pushToast('ERROR', msg.importFailed, err.message)
+      pushToast(
+        'ERROR',
+        msg.importFailed,
+        `${err.message}\n${lang === 'zh'
+          ? '本机导入需要服务器上已登录 Qoder 客户端。手机上没有该凭据，请改用「通过 Qoder 登录页添加」。'
+          : 'Local import needs a signed-in Qoder client on this server. Use “Sign in on Qoder” instead.'}`,
+      )
     }
+  }
+
+  const startDeviceLogin = async () => {
+    setDeviceError(null)
+    setDeviceStatus('pending')
+    try {
+      const resp = await authedFetch('/ui/accounts/device/start', { method: 'POST' })
+      const data = await resp.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to start login')
+      setDeviceFlow({ flow_id: data.flow_id, auth_url: data.auth_url })
+      setDeviceRemaining(Number(data.expires_in) || 300)
+      window.open(data.auth_url, '_blank', 'noopener')
+      setDeviceStatus('pending')
+    } catch (e: any) {
+      setDeviceStatus('error')
+      setDeviceError(e.message)
+    }
+  }
+
+  const closeAddAccount = () => {
+    setShowAddAccount(false)
+    setShowBatchImport(false)
+    setDeviceFlow(null)
+    setDeviceStatus('idle')
+    setDeviceError(null)
+    setDeviceRemaining(0)
   }
 
   const handleSelectAccount = async (uid: string) => {
@@ -2037,17 +2100,83 @@ export default function App() {
 
       {/* Add account modal */}
       {showAddAccount && (
-        <Modal title={t.accounts.importAccounts} subtitle={lang === 'zh' ? '无需手动输入 Token 或 PAT' : 'No manual token or PAT required'} onClose={() => { setShowAddAccount(false); setShowBatchImport(false) }}>
+        <Modal title={t.accounts.importAccounts} subtitle={lang === 'zh' ? '手机号 / 账号密码登录，或导入现有凭据' : 'Sign in with phone, or import existing credentials'} onClose={closeAddAccount}>
           <div className="space-y-3">
-            <button onClick={handleImportAuth} className="w-full text-left p-4 rounded-xl border border-hairline hover:border-hairline-strong hover:bg-canvas-soft transition-colors">
+            {/* Qoder sign-in (device flow) */}
+            <div className="p-4 rounded-xl border border-hairline">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-mint flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[18px] text-mint-deep">download_for_offline</span>
+                  <span className="material-symbols-outlined text-[18px] text-mint-deep">login</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium text-ink">{lang === 'zh' ? '通过 Qoder 登录页添加' : 'Sign in on Qoder'}</div>
+                  <div className="text-[10px] text-body mt-0.5">
+                    {lang === 'zh' ? '手机号验证码 / 账号密码登录，授权后自动写入账号池' : 'Phone + SMS code or password; auto-saved after approval'}
+                  </div>
+                </div>
+              </div>
+
+              {deviceStatus === 'idle' && (
+                <button onClick={startDeviceLogin} className="mt-3 w-full py-2.5 bg-ink text-white rounded-full text-[11px] font-medium hover:bg-primary transition-colors flex items-center justify-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px]">open_in_new</span>
+                  {lang === 'zh' ? '打开 Qoder 登录页' : 'Open Qoder sign-in'}
+                </button>
+              )}
+
+              {deviceStatus === 'pending' && deviceFlow && (
+                <div className="mt-3 rounded-lg bg-canvas-soft p-3">
+                  <div className="flex items-center gap-2 text-[11px] text-ink">
+                    <svg className="animate-spin h-3.5 w-3.5 text-body" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>{lang === 'zh' ? '等待你在浏览器完成登录…' : 'Waiting for browser sign-in…'}</span>
+                    <span className="ml-auto font-mono text-[10px] text-body">{deviceRemaining}s</span>
+                  </div>
+                  <p className="text-[10px] text-body mt-1.5">
+                    {lang === 'zh' ? '如未自动打开新窗口，请点击下方链接。登录并同意授权后，此窗口会自动完成。' : 'If no tab opened, use the link below. It completes automatically after approval.'}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <a href={deviceFlow.auth_url} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-white border border-hairline rounded-full text-[10px] font-medium text-ink hover:bg-canvas-soft transition-colors flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+                      {lang === 'zh' ? '重新打开登录页' : 'Reopen sign-in'}
+                    </a>
+                    <button onClick={() => { navigator.clipboard.writeText(deviceFlow.auth_url); pushToast('INFO', lang === 'zh' ? '已复制链接' : 'Link copied', '') }} className="px-3 py-1.5 bg-white border border-hairline rounded-full text-[10px] font-medium text-body hover:text-ink transition-colors flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                      {lang === 'zh' ? '复制链接' : 'Copy link'}
+                    </button>
+                    <button onClick={startDeviceLogin} className="px-3 py-1.5 text-[10px] font-medium text-body hover:text-ink transition-colors">
+                      {lang === 'zh' ? '重新开始' : 'Restart'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {deviceStatus === 'success' && (
+                <div className="mt-3 p-2.5 rounded-lg bg-mint-soft text-[11px] text-mint-deep flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                  {lang === 'zh' ? '登录成功，账号已写入账号池' : 'Signed in and saved'}
+                </div>
+              )}
+
+              {(deviceStatus === 'error' || deviceStatus === 'expired') && (
+                <div className="mt-3 p-2.5 rounded-lg bg-toast-error/10 text-[11px] text-toast-error">
+                  {deviceError || (lang === 'zh' ? '登录失败' : 'Sign-in failed')}
+                  <button onClick={startDeviceLogin} className="ml-2 underline font-medium">{lang === 'zh' ? '重试' : 'Retry'}</button>
+                </div>
+              )}
+            </div>
+
+            {/* Local import (desktop only) */}
+            <button onClick={handleImportAuth} className="w-full text-left p-4 rounded-xl border border-hairline hover:border-hairline-strong hover:bg-canvas-soft transition-colors">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-canvas-soft border border-hairline flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[18px] text-body">download_for_offline</span>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-medium text-ink">{lang === 'zh' ? '一键导入本机 Qoder 登录' : 'Import local Qoder session'}</div>
+                  <div className="text-xs font-medium text-ink">{lang === 'zh' ? '导入本机 Qoder 登录（仅电脑端）' : 'Import local Qoder session (desktop)'}</div>
                   <div className="text-[10px] text-body mt-0.5">
-                    {lang === 'zh' ? '自动读取本机已登录的 Qoder 凭据，无需粘贴任何密钥' : 'Reads the Qoder credentials already signed in on this machine'}
+                    {lang === 'zh' ? '仅当运行网关的电脑已登录 Qoder 客户端时可用' : 'Only works when the gateway host has a signed-in Qoder client'}
                   </div>
                 </div>
                 <span className="material-symbols-outlined text-body ml-auto text-[18px]">arrow_forward</span>

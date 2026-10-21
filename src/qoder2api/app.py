@@ -42,6 +42,7 @@ from .campaigns import (
 )
 from .usage import estimate_tokens, get_usage_stats, record_usage
 from .models import openai_model_list
+from .device_login import get_device_status, start_device_login
 
 
 BASE_DIR = os.path.dirname(__file__)
@@ -233,6 +234,22 @@ async def batch_import(payload: dict[str, Any], verify: None = Depends(check_gat
     result = batch_import_accounts(records)
     add_log(f"Batch imported {result['imported']} accounts (skipped {result['skipped']})")
     return {"status": "ok", **result}
+
+
+@app.post("/ui/accounts/device/start")
+async def device_login_start(verify: None = Depends(check_gateway_token)) -> dict[str, Any]:
+    """启动 Qoder CN 设备授权登录，返回授权链接供用户在浏览器完成手机号登录。"""
+    flow = start_device_login()
+    add_log("Device login flow started; waiting for browser authorization.")
+    return flow
+
+
+@app.get("/ui/accounts/device/status")
+async def device_login_status(flow_id: str, verify: None = Depends(check_gateway_token)) -> dict[str, Any]:
+    status = get_device_status(flow_id)
+    if status.get("status") == "success" and status.get("account"):
+        add_log(f"Device login succeeded for account: {status['account'].get('name')}")
+    return status
 
 
 @app.post("/ui/accounts/select")
