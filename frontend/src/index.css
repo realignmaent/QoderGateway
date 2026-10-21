@@ -7,22 +7,27 @@
   --color-body: #57534e;
   --color-hairline: #e7e5e4;
   --color-hairline-strong: #d6d3d1;
-  --color-mint: #10b981;
-  --color-mint-soft: #d1fae5;
-  --color-peach: #f97316;
-  --color-peach-soft: #ffedd5;
-  --color-sky: #3b82f6;
-  --color-sky-soft: #dbeafe;
-  --color-lavender: #8b5cf6;
+  --color-mint: #a7e5d3;
+  --color-mint-deep: #0f766e;
+  --color-mint-soft: #ecfdf5;
+  --color-peach: #f4c5a8;
+  --color-peach-deep: #c2410c;
+  --color-peach-soft: #fff7ed;
+  --color-sky: #a8c8e8;
+  --color-sky-deep: #1d4ed8;
+  --color-sky-soft: #eff6ff;
+  --color-lavender: #c8b8e0;
+  --color-lavender-soft: #f5f3ff;
   --color-canvas-soft: #fafaf9;
-  --color-surface: #ffffff;
+  --color-surface: #f9f8f6;
   --color-surface-card: #ffffff;
   --color-on-primary: #ffffff;
-  --color-on-surface-variant: #57534e;
-  --color-toast-error: #ef4444;
-  --color-toast-success: #10b981;
-  --color-toast-info: #3b82f6;
+  --color-on-surface-variant: #4e4543;
+  --color-toast-error: #dc2626;
+  --color-toast-success: #0f766e;
+  --color-toast-info: #1d4ed8;
   --font-sans: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-display: 'Instrument Serif', 'Noto Serif SC', 'Songti SC', Georgia, serif;
 }
 
 html, body {
@@ -34,19 +39,25 @@ html, body {
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-.font-display-lg { font-size: 28px; line-height: 1.2; letter-spacing: -0.02em; font-weight: 600; }
-.font-display-md { font-size: 22px; line-height: 1.3; letter-spacing: -0.01em; font-weight: 600; }
-.font-display-sm { font-size: 18px; line-height: 1.4; font-weight: 600; }
+.font-display-lg { font-family: var(--font-display); font-size: 34px; line-height: 1.15; letter-spacing: -0.02em; font-weight: 400; }
+.font-display-md { font-family: var(--font-display); font-size: 26px; line-height: 1.2; letter-spacing: -0.01em; font-weight: 400; }
+.font-display-sm { font-family: var(--font-display); font-size: 20px; line-height: 1.3; font-weight: 400; }
 
 .card {
   background: var(--color-surface-card);
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid var(--color-hairline);
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 6px 20px rgba(28, 25, 23, 0.05);
   border-color: var(--color-hairline-strong);
+}
+
+.card-muted {
+  background: #f4f2ef;
+  border-radius: 18px;
+  border: 1px solid transparent;
 }
 
 .card-soft {
@@ -56,9 +67,18 @@ html, body {
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.orb {
+  position: fixed;
+  border-radius: 9999px;
+  filter: blur(90px);
+  z-index: 0;
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .cursor-blink {
