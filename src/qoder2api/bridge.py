@@ -1,22 +1,150 @@
 import copy
+import hashlib
 import json
 import time
 import uuid
+import base64
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
+from cryptography.hazmat.primitives import padding, serialization
+from cryptography.hazmat.primitives.asymmetric import padding as asymmetric_padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from . import encoding
-from .auth import SessionContext, bearer_headers
+from .auth import SessionContext, SERVER_PUBKEY_PEM
 from .env import httpx_client_kwargs
 
 
-QODER_CHAT_URL = "https://api3.qoder.sh/algo/api/v2/service/pro/sse/agent_chat_generation?FetchKeys=llm_model_result&AgentId=agent_common&Encode=1"
-# 新版协议（Qoder CLI 现行）：OpenAI 兼容端点，纯 Bearer，无 COSY 签名，响应为标准 OpenAI SSE。
-# 性能远优于老版（老版默认带长 reasoning，复杂任务可到分钟级）。
 QODER_CHAT_URL_NEW = "https://api2-v2.qoder.sh/model/v1/chat/completions"
+QODER_CN_CHAT_URL = "https://gateway.qoder.com.cn/algo/api/v2/service/pro/sse/agent_chat_generation?FetchKeys=llm_model_result&AgentId=agent_common&Encode=1"
+
+CN_MODEL_ALIASES: dict[str, str] = {
+    # Auto
+    "auto": "auto",
+    "qoder": "auto",
+    "qoder-cn": "auto",
+    
+    # 通义千问 Qwen 系列
+    "qwen3.8-max": "qmodel_38max",
+    "qwen-3.8-max": "qmodel_38max",
+    "qmodel_38max": "qmodel_38max",
+    
+    "qwen3.8-flash": "qfmodel",
+    "qwen-3.8-flash": "qfmodel",
+    "qfmodel": "qfmodel",
+    
+    "qwen3.7-plus": "qmodel",
+    "qwen-3.7-plus": "qmodel",
+    "qmodel": "qmodel",
+    
+    "qwen3.7-max": "qmodel_latest",
+    "qwen-3.7-max": "qmodel_latest",
+    "qmodel_latest": "qmodel_latest",
+    
+    "qwen3.7-flash": "q37fmodel",
+    "qwen-3.7-flash": "q37fmodel",
+    "q37fmodel": "q37fmodel",
+    
+    # DeepSeek 深度求索系列
+    "deepseek-v4-pro": "dmodel",
+    "deepseek-v4": "dmodel",
+    "deepseek-v3": "dmodel",
+    "deepseek-r1": "dmodel",
+    "dmodel": "dmodel",
+    
+    "deepseek-flash": "dfmodel",
+    "deepseek-v4-flash": "dfmodel",
+    "dfmodel": "dfmodel",
+    
+    # 智谱 GLM 系列
+    "glm-5.3": "gmodel",
+    "glm-5": "gmodel",
+    "gmodel": "gmodel",
+    
+    "glm-5.3-flash": "gfmodel",
+    "glm-5-flash": "gfmodel",
+    "gfmodel": "gfmodel",
+    
+    # 月之暗面 Kimi 系列
+    "kimi-k3": "kmodel_latest",
+    "kmodel_latest": "kmodel_latest",
+    
+    "kimi-k2.8": "kmodel",
+    "kimi-k2.8-preview": "kmodel",
+    "kimi-k2.7-code": "kmodel",
+    "kmodel": "kmodel",
+    
+    # MiniMax 系列
+    "minimax-m3.1-flash": "mmodel",
+    "minimax-m2.7": "mmodel",
+    "mmodel": "mmodel",
+}
+
+
+ONE_MILLION_MODELS = {
+    "qmodel_38max", "qfmodel", "qmodel", "qmodel_latest", "q37fmodel",
+    "dmodel", "dfmodel", "gmodel", "gfmodel", "kmodel_latest", "kmodel"
+}
+
+# 各模型最高思考强度档位定义
+MODEL_MAX_EFFORT: dict[str, str] = {
+    # Qwen 系列：最高档位为 xhigh (极高深度思考)
+    "qmodel_38max": "xhigh",
+    "qfmodel": "xhigh",
+    "qmodel_latest": "xhigh",
+    "q37fmodel": "xhigh",
+    
+    # DeepSeek 系列：最高档位为 max (极致推理)
+    "dmodel": "max",
+    "dfmodel": "max",
+    
+    # GLM 系列：最高档位为 max (深度推演)
+    "gmodel": "max",
+    "gfmodel": "max",
+    
+    # Kimi 系列：最高档位为 max (超长思考链)
+    "kmodel_latest": "max",
+    "kmodel": "max",
+}
+
+
+
+def parse_model_and_effort(requested: str, explicit_effort: str | None = None) -> tuple[str, str | None, bool, str | None]:
+    raw = requested.strip()
+    effort = explicit_effort
+    enable_thinking = True
+    context_tag = None
+    
+    # 解析可能存在的多个标签 (如 deepseek-v4-pro:1m:max, qwen3.8-max:low, auto:off)
+    parts = raw.split(":")
+    base = parts[0]
+    for tag in parts[1:]:
+        t = tag.strip().lower()
+        if t in {"off", "none", "false", "0"}:
+            enable_thinking = False
+        elif t in {"low", "medium", "high", "max", "xhigh"}:
+            effort = t
+        elif t in {"1m", "400k", "200k"}:
+            context_tag = t
+            
+    if "-effort-" in base:
+        base_name, tag = base.split("-effort-", 1)
+        if tag in {"low", "medium", "high", "max", "xhigh"}:
+            effort = tag
+            base = base_name
+            
+    mapped_key = CN_MODEL_ALIASES.get(base.lower(), "auto")
+    return mapped_key, effort, enable_thinking, context_tag
+
+
+
+def is_cn_session(sess: SessionContext) -> bool:
+    token = sess.identity.security_oauth_token or ""
+    return token.startswith("jt-")
 
 
 def now_ms() -> int:
@@ -33,58 +161,6 @@ def blank_response_meta() -> dict[str, Any]:
             "completion_tokens_details": {"reasoning_tokens": 0},
             "prompt_tokens_details": {"cached_tokens": 0},
         },
-    }
-
-
-def template_base() -> dict[str, Any]:
-    return {
-        "request_id": str(uuid.uuid4()),
-        "request_set_id": str(uuid.uuid4()),
-        "chat_record_id": str(uuid.uuid4()),
-        "stream": True,
-        "chat_task": "FREE_INPUT",
-        "chat_context": {
-            "chatPrompt": "",
-            "extra": {"context": [], "modelConfig": {"is_reasoning": False, "key": "lite"}, "originalContent": {"type": "text", "text": "hi"}},
-            "features": [],
-            "imageUrls": None,
-            "text": {"type": "text", "text": "hi"},
-        },
-        "image_urls": None,
-        "is_reply": True,
-        "is_retry": False,
-        "session_id": str(uuid.uuid4()),
-        "code_language": "",
-        "source": 1,
-        "version": "3",
-        "chat_prompt": "",
-        "parameters": {"max_tokens": 32768},
-        "aliyun_user_type": "personal_standard",
-        "session_type": "qodercli",
-        "agent_id": "agent_common",
-        "task_id": "common",
-        "model_config": {
-            "key": "lite",
-            "display_name": "Lite",
-            "model": "",
-            "format": "openai",
-            "is_vl": False,
-            "is_reasoning": False,
-            "api_key": "",
-            "url": "",
-            "source": "system",
-            "max_input_tokens": 180000,
-        },
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are Qoder, an interactive CLI tool that helps users with software engineering tasks.",
-                "response_meta": blank_response_meta(),
-                "reasoning_content_signature": "",
-            }
-        ],
-        "tools": [],
-        "business": {"product": "cli", "version": "0.1.43", "type": "agent", "id": str(uuid.uuid4()), "name": "hi", "begin_at": now_ms(), "stage": "start"},
     }
 
 
@@ -195,51 +271,8 @@ def render_tool_result(message: dict[str, Any], text: str) -> str:
     return f"{label}:\n{text}" if text.strip() else label
 
 
-def convert_incoming_message(message: dict[str, Any], tools_enabled: bool) -> dict[str, Any] | None:
-    role = message.get("role", "user")
-    text = normalize_message_text(message)
-    if not tools_enabled and message.get("tool_calls"):
-        calls = json.dumps(message["tool_calls"], ensure_ascii=False)
-        text = f"{text}\n\nTool calls:\n{calls}" if text.strip() else f"Tool calls:\n{calls}"
-    if role == "tool":
-        if tools_enabled:
-            out = build_structured_message("tool", text)
-            if message.get("name"):
-                out["name"] = message["name"]
-            if message.get("tool_call_id"):
-                out["tool_call_id"] = message["tool_call_id"]
-            return out
-        role = "user"
-        text = render_tool_result(message, text)
-    if not text.strip() and not (tools_enabled and role == "assistant" and message.get("tool_calls")):
-        return None
-    if role == "user":
-        return build_user_message(text)
-    out = build_structured_message(role, text)
-    if tools_enabled and role == "assistant":
-        tool_calls = normalize_tool_calls(message.get("tool_calls")) or parse_tool_calls_text(text)
-        if tool_calls:
-            out["tool_calls"] = tool_calls
-            if parse_tool_calls_text(text):
-                out["content"] = ""
-    return out
-
-
-def build_qoder_messages(template_messages: list[dict[str, Any]], incoming: list[dict[str, Any]], prompt: str, tools_enabled: bool) -> list[dict[str, Any]]:
-    rebuilt = []
-    if not any(message.get("role") == "system" for message in incoming or []):
-        rebuilt.extend(copy.deepcopy(message) for message in template_messages if message.get("role") == "system")
-    for message in incoming or []:
-        converted = convert_incoming_message(message, tools_enabled)
-        if converted:
-            rebuilt.append(converted)
-    if not rebuilt and prompt.strip():
-        rebuilt.append(build_user_message(prompt))
-    return rebuilt
-
-
 def build_qoder_body(req: dict[str, Any], sess: SessionContext) -> tuple[dict[str, Any], str, bool]:
-    """新版协议 body：OpenAI 原生格式，直接透传 messages/tools。"""
+    """国际版协议 body：OpenAI 原生格式。"""
     model = req.get("model") or "lite"
     messages = req.get("messages") if isinstance(req.get("messages"), list) else []
     tools_enabled = bool(req.get("tools"))
@@ -264,15 +297,206 @@ def build_qoder_body(req: dict[str, Any], sess: SessionContext) -> tuple[dict[st
     return body, model, tools_enabled
 
 
+def build_qoder_cn_body_and_headers(req: dict[str, Any], sess: SessionContext) -> tuple[str, dict[str, str], str, bool]:
+    """国内版协议 (Qoder CN)：COSY 签名 + Base64 编码 Body + 推理档位适配。"""
+    requested_model = req.get("model") or "auto"
+    explicit_effort = req.get("reasoning_effort")
+    mapped_model, effort, enable_thinking, context_tag = parse_model_and_effort(requested_model, explicit_effort)
+    
+    messages = req.get("messages") if isinstance(req.get("messages"), list) else []
+    tools_raw = req.get("tools") or []
+    tools_enabled = bool(tools_raw)
+
+    last_user_text = extract_latest_user_prompt(messages) or "hi"
+
+    normalized_messages = []
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = normalize_message_text(msg)
+        normalized_messages.append({"role": role, "content": content})
+
+    parameters: dict[str, Any] = {"max_tokens": 8192}
+    if effort:
+        parameters["reasoning_effort"] = effort
+        parameters["enable_thinking"] = True
+    elif not enable_thinking:
+        parameters["enable_thinking"] = False
+    else:
+        # 思考强度默认拉满至模型最大可用档位 (如 Qwen 为 xhigh, DeepSeek/GLM/Kimi 为 max)
+        max_effort = MODEL_MAX_EFFORT.get(mapped_model)
+        if max_effort:
+            parameters["reasoning_effort"] = max_effort
+            parameters["enable_thinking"] = True
+            effort = max_effort
+        else:
+            parameters["enable_thinking"] = True
+
+
+    # 上下文窗口智能最大化 (默认针对全部支持 1M 的模型锁定 1,000,000 Tokens)
+    if mapped_model in ONE_MILLION_MODELS:
+        if context_tag == "400k":
+            max_input_tokens = 400000
+            ctx_cfg = {"400K": {"token_count": 400000, "is_default": True}, "200K": {"token_count": 200000}, "1M": {"token_count": 1000000}}
+        elif context_tag == "200k":
+            max_input_tokens = 200000
+            ctx_cfg = {"200K": {"token_count": 200000, "is_default": True}, "400K": {"token_count": 400000}, "1M": {"token_count": 1000000}}
+        else:
+            max_input_tokens = 1000000
+            ctx_cfg = {"1M": {"token_count": 1000000, "is_default": True}, "400K": {"token_count": 400000}, "200K": {"token_count": 200000}}
+    else:
+        max_input_tokens = 200000
+        ctx_cfg = {"200K": {"token_count": 200000, "is_default": True}}
+
+    rec_id = str(uuid.uuid4())
+    body_obj = {
+        "request_id": str(uuid.uuid4()),
+        "request_set_id": rec_id,
+        "chat_record_id": rec_id,
+        "session_id": str(uuid.uuid4()),
+        "stream": True,
+        "chat_task": "FREE_INPUT",
+        "is_reply": True,
+        "is_retry": False,
+        "source": 1,
+        "version": "3",
+        "session_type": "qodercli",
+        "agent_id": "agent_common",
+        "task_id": "common",
+        "code_language": "",
+        "chat_prompt": "",
+        "image_urls": None,
+        "aliyun_user_type": "",
+        "system": "",
+        "messages": normalized_messages,
+        "tools": tools_raw,
+        "parameters": parameters,
+        "chat_context": {
+            "chatPrompt": "",
+            "imageUrls": None,
+            "extra": {
+                "context": [],
+                "modelConfig": {
+                    "key": mapped_model,
+                    "is_reasoning": enable_thinking,
+                    "max_input_tokens": max_input_tokens,
+                    "context_config": ctx_cfg
+                },
+                "originalContent": last_user_text,
+            },
+            "features": [],
+            "text": last_user_text,
+        },
+        "model_config": {
+            "key": mapped_model,
+            "display_name": mapped_model,
+            "is_reasoning": enable_thinking,
+            "source": "system",
+            "max_input_tokens": max_input_tokens,
+            "context_config": ctx_cfg
+        },
+
+        "business": {
+            "product": "cli",
+            "version": "1.0.0",
+            "type": "agent",
+            "stage": "start",
+            "id": str(uuid.uuid4()),
+            "name": last_user_text[:30],
+            "begin_at": now_ms(),
+        },
+    }
+
+    raw_json = json.dumps(body_obj, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    encoded_body = encoding.encode(raw_json)
+
+    # COSY 签名计算
+    aes_key = uuid.uuid4().hex[:16]
+    user_info = {
+        "uid": sess.identity.uid,
+        "security_oauth_token": sess.identity.security_oauth_token,
+        "name": sess.identity.name or "",
+        "aid": "",
+        "email": "",
+    }
+    padder = padding.PKCS7(128).padder()
+    padded = padder.update(json.dumps(user_info, separators=(",", ":")).encode("utf-8")) + padder.finalize()
+    cipher = Cipher(algorithms.AES(aes_key.encode("ascii")), modes.CBC(aes_key.encode("ascii")))
+    encryptor = cipher.encryptor()
+    info_b64 = base64.b64encode(encryptor.update(padded) + encryptor.finalize()).decode("ascii")
+
+    pubkey = serialization.load_pem_public_key(SERVER_PUBKEY_PEM)
+    cosy_key = base64.b64encode(pubkey.encrypt(aes_key.encode("ascii"), asymmetric_padding.PKCS1v15())).decode("ascii")
+
+    timestamp = str(int(time.time()))
+    req_id = str(uuid.uuid4())
+    cosy_payload = {
+        "version": "v1",
+        "requestId": req_id,
+        "info": info_b64,
+        "cosyVersion": "1.1.38",
+        "ideVersion": "",
+    }
+    payload_b64 = base64.b64encode(json.dumps(cosy_payload, separators=(",", ":")).encode("utf-8")).decode("ascii")
+
+    sig_path = "/api/v2/service/pro/sse/agent_chat_generation"
+    body_bytes = encoded_body.encode("utf-8")
+
+    m = hashlib.md5()
+    m.update(payload_b64.encode("utf-8"))
+    m.update(b"\n")
+    m.update(cosy_key.encode("utf-8"))
+    m.update(b"\n")
+    m.update(timestamp.encode("utf-8"))
+    m.update(b"\n")
+    m.update(body_bytes)
+    m.update(b"\n")
+    m.update(sig_path.encode("utf-8"))
+    sig = m.hexdigest()
+
+    body_hash = hashlib.md5(body_bytes).hexdigest()
+    body_len = str(len(body_bytes))
+    machine_id = sess.machine_id or str(uuid.uuid4())
+
+    headers = {
+        "Authorization": f"Bearer COSY.{payload_b64}.{sig}",
+        "Cosy-Key": cosy_key,
+        "Cosy-User": sess.identity.uid,
+        "Cosy-Date": timestamp,
+        "Cosy-Version": "1.1.38",
+        "Cosy-Machineid": machine_id,
+        "Cosy-Machinetoken": machine_id,
+        "Cosy-Machinetype": "5",
+        "Cosy-Machineos": "aarch64_linux",
+        "Cosy-Clienttype": "5",
+        "Cosy-Clientip": "127.0.0.1",
+        "Cosy-Bodyhash": body_hash,
+        "Cosy-Bodylength": body_len,
+        "Cosy-Sigpath": sig_path,
+        "Cosy-Data-Policy": "disagree",
+        "Cosy-Organization-Id": "",
+        "Cosy-Organization-Tags": "",
+        "Login-Version": "v2",
+        "X-Request-Id": str(uuid.uuid4()),
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Accept-Encoding": "identity",
+        "X-Model-Key": mapped_model,
+        "X-Model-Source": "system",
+    }
+    return encoded_body, headers, requested_model, tools_enabled
+
+
 @dataclass
 class BridgeDelta:
     role: str = ""
     content: str = ""
+    reasoning_content: str = ""
     tool_calls: list[dict[str, Any]] | None = None
 
     @property
     def is_empty(self) -> bool:
-        return not self.role and not self.content and not self.tool_calls
+        return not self.role and not self.content and not self.reasoning_content and not self.tool_calls
 
 
 def extract_delta(data_line: str) -> BridgeDelta:
@@ -286,22 +510,27 @@ def extract_delta(data_line: str) -> BridgeDelta:
                 delta = choice.get("delta", {}) if isinstance(choice, dict) else {}
                 role = delta.get("role") or ""
                 content = delta.get("content") or ""
+                reasoning = delta.get("reasoning_content") or delta.get("reasoning") or ""
                 tool_calls = delta.get("tool_calls") if isinstance(delta.get("tool_calls"), list) else None
-                if role or content or tool_calls:
-                    return BridgeDelta(role, content, tool_calls)
+                if role or content or reasoning or tool_calls:
+                    return BridgeDelta(role, content, reasoning, tool_calls)
             return BridgeDelta()
-        # 老版：wrapper 内嵌 body 字符串
+        # 老版 / 国内版：wrapper 内嵌 body 字符串
         inner = obj.get("body") or ""
-        if not inner:
+        if not inner or inner == "[DONE]":
             return BridgeDelta()
-        inner_json = json.loads(inner)
+        try:
+            inner_json = json.loads(inner)
+        except Exception:
+            return BridgeDelta()
         for choice in inner_json.get("choices", []):
-            delta = choice.get("delta", {})
+            delta = choice.get("delta", {}) if isinstance(choice, dict) else {}
             role = delta.get("role") or ""
             content = delta.get("content") or ""
+            reasoning = delta.get("reasoning_content") or ""
             tool_calls = delta.get("tool_calls") if isinstance(delta.get("tool_calls"), list) else None
-            if role or content or tool_calls:
-                return BridgeDelta(role, content, tool_calls)
+            if role or content or reasoning or tool_calls:
+                return BridgeDelta(role, content, reasoning, tool_calls)
     except (TypeError, json.JSONDecodeError):
         return BridgeDelta()
     return BridgeDelta()
@@ -335,8 +564,25 @@ class ToolCallAccumulator:
         return copy.deepcopy(self.calls)
 
 
-async def qoder_stream_lines(sess: SessionContext, body: dict[str, Any], model: str) -> AsyncIterator[str]:
-    """新版协议：POST api2-v2.qoder.sh/model/v1/chat/completions，Bearer 直连。"""
+async def qoder_stream_lines(sess: SessionContext, req: dict[str, Any]) -> tuple[AsyncIterator[str], str, bool]:
+    """自适应路由：国内版走 gateway.qoder.com.cn，国际版走 api2-v2.qoder.sh。"""
+    if is_cn_session(sess):
+        encoded_body, headers, model, tools_enabled = build_qoder_cn_body_and_headers(req, sess)
+
+        async def _cn_gen() -> AsyncIterator[str]:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=15), **httpx_client_kwargs()) as client:
+                async with client.stream("POST", QODER_CN_CHAT_URL, content=encoded_body, headers=headers) as response:
+                    if response.status_code != 200:
+                        text = await response.aread()
+                        raise RuntimeError(f"HTTP {response.status_code} {text.decode(errors='replace')}")
+                    async for line in response.aiter_lines():
+                        if line:
+                            yield line
+
+        return _cn_gen(), model, tools_enabled
+
+    # 国际版协议
+    body, model, tools_enabled = build_qoder_body(req, sess)
     ctx = (body.get("metadata") or {}).get("context") or {}
     headers = {
         "Authorization": f"Bearer {sess.identity.security_oauth_token}",
@@ -346,18 +592,22 @@ async def qoder_stream_lines(sess: SessionContext, body: dict[str, Any], model: 
         "X-Request-ID": ctx.get("request_id", ""),
         "X-Session-ID": ctx.get("session_id", ""),
     }
-    async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=15), **httpx_client_kwargs()) as client:
-        async with client.stream("POST", QODER_CHAT_URL_NEW, json=body, headers=headers) as response:
-            if response.status_code != 200:
-                text = await response.aread()
-                raise RuntimeError(f"HTTP {response.status_code} {text.decode(errors='replace')}")
-            async for line in response.aiter_lines():
-                if line:
-                    yield line
+
+    async def _global_gen() -> AsyncIterator[str]:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=15), **httpx_client_kwargs()) as client:
+            async with client.stream("POST", QODER_CHAT_URL_NEW, json=body, headers=headers) as response:
+                if response.status_code != 200:
+                    text = await response.aread()
+                    raise RuntimeError(f"HTTP {response.status_code} {text.decode(errors='replace')}")
+                async for line in response.aiter_lines():
+                    if line:
+                        yield line
+
+    return _global_gen(), model, tools_enabled
 
 
 async def stream_openai_response(req: dict[str, Any], sess: SessionContext) -> AsyncIterator[str]:
-    body, model, tools_enabled = build_qoder_body(req, sess)
+    lines_iter, model, tools_enabled = await qoder_stream_lines(sess, req)
     chunk_id = "chatcmpl-" + uuid.uuid4().hex[:24]
     created = int(time.time())
     tool_calls = ToolCallAccumulator()
@@ -369,14 +619,27 @@ async def stream_openai_response(req: dict[str, Any], sess: SessionContext) -> A
     def event(payload: dict[str, Any]) -> str:
         return f"data: {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}\n\n"
 
-    async for line in qoder_stream_lines(sess, body, model):
+    async for line in lines_iter:
         if not line.startswith("data:"):
             continue
-        delta = extract_delta(line[5:].strip())
+        raw_data = line[5:].strip()
+        if raw_data == "[DONE]":
+            break
+        delta = extract_delta(raw_data)
         if delta.is_empty:
             continue
         if delta.role:
             pending_role = delta.role
+
+        # 思考链 (Reasoning Content)
+        if delta.reasoning_content:
+            out_delta: dict[str, Any] = {"reasoning_content": delta.reasoning_content}
+            if not emitted:
+                out_delta["role"] = pending_role
+            emitted = True
+            yield event(make_chunk(chunk_id, created, model, out_delta))
+            continue
+
         if delta.tool_calls:
             pending = "" if tools_enabled and pending.lstrip().startswith("Tool calls:") else pending
             indexed = []
@@ -391,8 +654,10 @@ async def stream_openai_response(req: dict[str, Any], sess: SessionContext) -> A
             emitted = True
             yield event(make_chunk(chunk_id, created, model, out_delta))
             continue
+
         if not delta.content:
             continue
+
         if not tools_enabled or streaming_text:
             out_delta = {"content": delta.content}
             if not emitted:
@@ -401,6 +666,7 @@ async def stream_openai_response(req: dict[str, Any], sess: SessionContext) -> A
             streaming_text = True
             yield event(make_chunk(chunk_id, created, model, out_delta))
             continue
+
         pending += delta.content
         candidate = pending.lstrip()
         if "Tool calls:".startswith(candidate) or candidate.startswith("Tool calls:"):
@@ -431,20 +697,28 @@ async def stream_openai_response(req: dict[str, Any], sess: SessionContext) -> A
 
 
 async def complete_openai_response(req: dict[str, Any], sess: SessionContext) -> dict[str, Any]:
-    body, model, tools_enabled = build_qoder_body(req, sess)
+    lines_iter, model, tools_enabled = await qoder_stream_lines(sess, req)
     completion_id = "chatcmpl-" + uuid.uuid4().hex[:24]
     created = int(time.time())
-    full = []
+    full_content = []
+    full_reasoning = []
     tool_calls = ToolCallAccumulator()
-    async for line in qoder_stream_lines(sess, body, model):
+
+    async for line in lines_iter:
         if not line.startswith("data:"):
             continue
-        delta = extract_delta(line[5:].strip())
+        raw_data = line[5:].strip()
+        if raw_data == "[DONE]":
+            break
+        delta = extract_delta(raw_data)
         if delta.content:
-            full.append(delta.content)
+            full_content.append(delta.content)
+        if delta.reasoning_content:
+            full_reasoning.append(delta.reasoning_content)
         if delta.tool_calls:
             tool_calls.append(delta.tool_calls)
-    content = "".join(full)
+
+    content = "".join(full_content)
     fallback_tool_calls = None if tool_calls.calls or not tools_enabled else parse_tool_calls_text(content)
     message: dict[str, Any] = {"role": "assistant"}
     if fallback_tool_calls:
@@ -454,8 +728,13 @@ async def complete_openai_response(req: dict[str, Any], sess: SessionContext) ->
         message["content"] = None
     else:
         message["content"] = content
+
+    if full_reasoning:
+        message["reasoning_content"] = "".join(full_reasoning)
+
     if tool_calls.calls:
         message["tool_calls"] = tool_calls.snapshot()
+
     return {
         "id": completion_id,
         "object": "chat.completion",
