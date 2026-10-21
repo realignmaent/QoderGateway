@@ -665,7 +665,7 @@ export default function App() {
       const cards = statCardsRef.current.querySelectorAll('.stat-card')
       gsap.fromTo(cards, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.42, stagger: 0.06, ease: 'power2.out' })
     }
-  }, [activeTab, token, status])
+  }, [activeTab, token])
 
   // ─── Handlers ───
 
@@ -1134,7 +1134,10 @@ export default function App() {
                       </div>
                     )}
                     {accounts.map(acc => {
-                      const q = quotaByUid.get(acc.uid)?.quota?.userQuota
+                      const perAccount = quotaByUid.get(acc.uid)?.quota?.userQuota
+                      const q = perAccount && perAccount.total
+                        ? perAccount
+                        : (acc.uid === accountsConfig.active_uid && planQuota?.total ? planQuota : null)
                       const hasDetail = Boolean(q && q.total)
                       const usedPct = hasDetail && q ? Math.min(100, Math.round((q.used / q.total) * 100)) : null
                       const isHealthy = acc.enabled && acc.last_status === 'ok' && !acc.is_quota_exceeded
