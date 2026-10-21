@@ -257,8 +257,8 @@ function AreaChart({ data, valueKey = 'tokens', height = 170, stroke = '#c2410c'
         )}
       </div>
       <div className="flex justify-between mt-1 px-1">
-        {data.map((d, i) => (
-          <span key={`${d.label}-${i}`} className={`text-[9px] text-body/70 ${i % labelEvery === 0 ? '' : 'invisible'}`}>{d.label}</span>
+        {data.filter((_, i) => i % labelEvery === 0).map((d, i) => (
+          <span key={`${d.label}-${i}`} className="text-[9px] text-body/70">{d.label}</span>
         ))}
       </div>
     </div>
@@ -1162,7 +1162,13 @@ export default function App() {
                           )}
                           <div className="flex items-center justify-between mt-1.5 text-[10px] text-body">
                             <span>{usedPct !== null && q ? `${q.remaining} / ${q.total} Credits` : acc.quota ? (lang === 'zh' ? `记录额度 ${acc.quota}` : `Recorded ${acc.quota}`) : '—'}</span>
-                            <span>{acc.next_reset_at ? new Date(acc.next_reset_at).toLocaleDateString() : '—'}</span>
+                            <span>
+                              {acc.next_reset_at
+                                ? `${new Date(acc.next_reset_at).toLocaleDateString()} ${lang === 'zh' ? '重置' : 'reset'}`
+                                : acc.uid === accountsConfig.active_uid && expiresAt
+                                  ? `${lang === 'zh' ? '有效期至' : 'valid'} ${expiresAt}`
+                                  : '—'}
+                            </span>
                           </div>
                         </div>
                       )
@@ -1325,7 +1331,10 @@ export default function App() {
                         <tr><td colSpan={6} className="py-12 text-center text-xs text-body">{t.accounts.empty}</td></tr>
                       ) : filteredAccounts.map(acc => {
                         const isActive = accountsConfig.active_uid === acc.uid
-                        const q = quotaByUid.get(acc.uid)?.quota?.userQuota
+                        const perAccount = quotaByUid.get(acc.uid)?.quota?.userQuota
+                        const q = perAccount && perAccount.total
+                          ? perAccount
+                          : (isActive && planQuota?.total ? planQuota : null)
                         const hasQuotaDetail = Boolean(q && q.total)
                         const usedPct = hasQuotaDetail && q ? Math.min(100, Math.round((q.used / q.total) * 100)) : null
                         const expiresTs = acc.token_expires_at ? new Date(acc.token_expires_at).getTime() : 0
