@@ -165,9 +165,9 @@ const UI_TEXT = {
 } as const
 
 const TOAST_STYLES: Record<ToastType, { bg: string; border: string; icon: string; iconFill: string }> = {
-  SUCCESS: { bg: 'bg-white', border: 'border-l-[3px] border-l-toast-success', icon: 'check_circle', iconFill: 'text-toast-success' },
+  SUCCESS: { bg: 'bg-white', border: 'border-l-[3px] border-l-mint', icon: 'check_circle', iconFill: 'text-mint' },
   ERROR: { bg: 'bg-white', border: 'border-l-[3px] border-l-toast-error', icon: 'error', iconFill: 'text-toast-error' },
-  INFO: { bg: 'bg-white', border: 'border-l-[3px] border-l-toast-info', icon: 'info', iconFill: 'text-toast-info' },
+  INFO: { bg: 'bg-white', border: 'border-l-[3px] border-l-sky', icon: 'info', iconFill: 'text-sky' },
 }
 
 // ─── Toast Context ───
@@ -211,20 +211,20 @@ function CustomSelect({ value, onChange, options, placeholder }: { value: string
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full h-11 bg-white border border-hairline-strong rounded-lg px-4 text-sm text-ink font-medium flex items-center justify-between focus:ring-2 focus:ring-ink outline-none cursor-pointer hover:border-ink/30 transition-colors"
+        className="w-full h-11 bg-canvas-soft border border-hairline rounded-lg px-3 text-sm text-ink flex items-center justify-between focus:outline-none focus:border-hairline-strong hover:border-hairline-strong transition-colors cursor-pointer"
       >
         <span className={selected ? 'text-ink' : 'text-body/50'}>{selected?.label || placeholder || 'Select...'}</span>
         <span className={`material-symbols-outlined text-body text-[18px] transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>expand_more</span>
       </button>
       {open && (
-        <div className="custom-select-dropdown absolute top-full left-0 right-0 mt-1 bg-white border border-hairline rounded-lg shadow-xl z-[6000] overflow-hidden">
+        <div className="custom-select-dropdown absolute top-full left-0 right-0 mt-1 bg-white border border-hairline rounded-lg shadow-lg z-[6000] overflow-hidden">
           {options.map(opt => (
             <button
               key={opt.value}
               type="button"
               onClick={() => { onChange(opt.value); setOpen(false) }}
-              className={`w-full px-4 py-2.5 text-sm text-left font-medium transition-colors ${
-                opt.value === value ? 'bg-canvas-soft text-ink font-bold' : 'text-body hover:bg-canvas-soft hover:text-ink'
+              className={`w-full px-3 py-2 text-sm text-left transition-colors ${
+                opt.value === value ? 'bg-canvas-soft text-ink font-medium' : 'text-body hover:bg-canvas-soft hover:text-ink'
               }`}
             >
               {opt.label}
@@ -245,7 +245,7 @@ function CustomInput({ value, onChange, placeholder, type = 'text', className = 
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      className={`w-full bg-white border border-hairline-strong text-ink text-sm px-4 py-3 rounded-lg outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 transition-all placeholder:text-body/40 ${mono ? 'font-mono' : 'font-medium'} ${className}`}
+      className={`w-full bg-canvas-soft border border-hairline text-ink text-sm px-3.5 py-2.5 rounded-lg outline-none focus:border-hairline-strong focus:bg-white transition-colors placeholder:text-body/50 ${mono ? 'font-mono' : ''} ${className}`}
     />
   )
 }
@@ -301,12 +301,12 @@ function ToastContainer({ toasts, dismiss }: { toasts: ToastItem[]; dismiss: (id
           <div
             key={t.id}
             ref={el => { if (el) itemRefs.current.set(t.id, el) }}
-            className={`pointer-events-auto ${s.bg} ${s.border} border border-hairline rounded-xl shadow-xl p-4 flex items-start gap-3 min-w-[320px]`}
+            className={`pointer-events-auto ${s.bg} ${s.border} border border-hairline rounded-xl shadow-lg p-3.5 flex items-start gap-3 min-w-[280px] max-w-[380px]`}
           >
-            <span className={`material-symbols-outlined ${s.iconFill} mt-0.5 shrink-0`} style={{ fontVariationSettings: "'FILL' 1", fontSize: '20px' }}>{s.icon}</span>
+            <span className={`material-symbols-outlined ${s.iconFill} mt-0.5 shrink-0`} style={{ fontVariationSettings: "'FILL' 1", fontSize: '18px' }}>{s.icon}</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-ink uppercase tracking-wider">{t.title}</div>
-              <div className="text-[12px] text-body mt-0.5 leading-relaxed break-words">{t.message}</div>
+              <div className="text-xs font-medium text-ink">{t.title}</div>
+              <div className="text-[11px] text-body mt-0.5 leading-relaxed break-words">{t.message}</div>
             </div>
             <button onClick={() => handleDismiss(t.id)} className="text-body/40 hover:text-ink transition-colors shrink-0 mt-0.5">
               <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
@@ -418,14 +418,10 @@ export default function App() {
   }
 
   const loginCardRef = useRef<HTMLDivElement>(null)
-  const sidebarRef = useRef<HTMLElement>(null)
   const contentBodyRef = useRef<HTMLDivElement>(null)
   const logEndRef = useRef<HTMLDivElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const statCardsRef = useRef<HTMLDivElement>(null)
-  const notifListRef = useRef<HTMLUListElement>(null)
-  const terminalRef = useRef<HTMLDivElement>(null)
-  const orbRefs = useRef<(HTMLDivElement | null)[]>([])
 
   // Toast state
   const [toasts, setToasts] = useState<ToastItem[]>([])
@@ -579,33 +575,14 @@ export default function App() {
   useEffect(() => { if (activeTab === 'playground') chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages, activeTab])
 
   // GSAP animations
-  useEffect(() => { if (!token && loginCardRef.current) gsap.fromTo(loginCardRef.current, { scale: 0.92, opacity: 0, y: 30 }, { scale: 1, opacity: 1, y: 0, duration: 0.7, ease: 'back.out(1.4)' }) }, [token])
-  useEffect(() => { if (token && sidebarRef.current) gsap.fromTo(sidebarRef.current, { x: -60, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: 'power3.out' }) }, [token])
-  useEffect(() => { if (token && contentBodyRef.current) gsap.fromTo(contentBodyRef.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }) }, [activeTab, token])
+  useEffect(() => { if (!token && loginCardRef.current) gsap.fromTo(loginCardRef.current, { scale: 0.94, opacity: 0, y: 20 }, { scale: 1, opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }) }, [token])
+  useEffect(() => { if (token && contentBodyRef.current) gsap.fromTo(contentBodyRef.current, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out' }) }, [activeTab, token])
   useEffect(() => {
     if (token && activeTab === 'dashboard' && statCardsRef.current) {
       const cards = statCardsRef.current.querySelectorAll('.stat-card')
-      gsap.fromTo(cards, { opacity: 0, y: 30, scale: 0.95 }, { opacity: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.1, ease: 'power2.out' })
+      gsap.fromTo(cards, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out' })
     }
   }, [activeTab, token, status])
-  useEffect(() => {
-    if (token && activeTab === 'dashboard' && notifListRef.current) {
-      const items = notifListRef.current.querySelectorAll('li')
-      gsap.fromTo(items, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, stagger: 0.12, ease: 'power2.out' })
-    }
-  }, [activeTab, token])
-  useEffect(() => {
-    if (token && activeTab === 'dashboard' && terminalRef.current) {
-      const lines = terminalRef.current.querySelectorAll('.term-line')
-      gsap.fromTo(lines, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.3, stagger: 0.15, ease: 'power1.out' })
-    }
-  }, [activeTab, token])
-  useEffect(() => {
-    orbRefs.current.forEach((orb, i) => {
-      if (!orb) return
-      gsap.to(orb, { x: `+=${10 + i * 5}`, y: `-=${8 + i * 3}`, duration: 6 + i * 2, repeat: -1, yoyo: true, ease: 'sine.inOut' })
-    })
-  }, [token])
 
   // ─── Handlers ───
 
@@ -788,12 +765,12 @@ export default function App() {
       const thinking = match[1]; const response = text.replace(thinkingRegex, '').trim()
       return (
         <div className="space-y-3">
-          <div className="bg-canvas-soft border border-hairline rounded-xl overflow-hidden">
-            <button onClick={() => setIsExpanded(!isExpanded)} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-body hover:text-ink transition-colors">
-              <span className="material-symbols-outlined text-base">psychology</span>Thinking Process
-              <span className={`material-symbols-outlined transition-transform ${isExpanded ? 'rotate-180' : ''}`}>expand_more</span>
+          <div className="card-soft overflow-hidden">
+            <button onClick={() => setIsExpanded(!isExpanded)} className="w-full flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium text-body hover:text-ink transition-colors">
+              <span className="material-symbols-outlined text-[16px]">psychology</span>Thinking Process
+              <span className={`material-symbols-outlined text-[16px] ml-auto transition-transform ${isExpanded ? 'rotate-180' : ''}`}>expand_more</span>
             </button>
-            {isExpanded && <div className="px-4 py-3 text-xs text-body italic leading-relaxed border-t border-hairline opacity-70 whitespace-pre-wrap">{thinking}</div>}
+            {isExpanded && <div className="px-3.5 py-2.5 text-[11px] text-body italic leading-relaxed border-t border-hairline whitespace-pre-wrap">{thinking}</div>}
           </div>
           {response && <div className="prose prose-stone max-w-none text-sm leading-relaxed"><ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{response}</ReactMarkdown></div>}
         </div>
@@ -838,49 +815,46 @@ export default function App() {
   // ─── LOGIN PAGE ───
   if (!token) {
     return (
-      <div className="bg-surface text-ink min-h-screen flex items-center justify-center p-4 overflow-hidden relative">
-        <div ref={el => { orbRefs.current[0] = el }} className="atmospheric-orb absolute top-1/4 left-1/3 w-[400px] h-[400px] bg-lavender rounded-full"></div>
-        <div ref={el => { orbRefs.current[1] = el }} className="atmospheric-orb absolute bottom-1/4 right-1/3 w-[500px] h-[500px] bg-sky rounded-full" style={{ animationDelay: '-4s' }}></div>
-        <main ref={loginCardRef} className="relative w-full max-w-[440px] z-10">
-          <div className="surface-card glass-card rounded-xl p-8 border border-hairline shadow-sm">
-            <div className="flex flex-col items-center mb-8">
-              <div className="w-10 h-10 bg-ink rounded-lg flex items-center justify-center mb-4">
-                <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>gate</span>
+      <div className="bg-surface text-ink min-h-screen flex items-center justify-center p-4">
+        <main ref={loginCardRef} className="w-full max-w-[400px]">
+          <div className="card p-8">
+            <div className="flex flex-col items-center mb-6">
+              <div className="w-10 h-10 bg-ink rounded-xl flex items-center justify-center mb-3">
+                <span className="material-symbols-outlined text-white text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>gate</span>
               </div>
-              <h1 className="font-display-lg text-ink tracking-tight">QoderGate</h1>
-              <p className="text-[12px] font-semibold text-on-surface-variant mt-2 uppercase tracking-widest">{lang === 'zh' ? '管理控制台' : 'Management Console'}</p>
+              <h1 className="text-xl font-semibold text-ink">QoderGate</h1>
+              <p className="text-[11px] text-body mt-1 uppercase tracking-widest">{lang === 'zh' ? '管理控制台' : 'Management Console'}</p>
             </div>
-            <form className="space-y-6" onSubmit={handleVerifyToken}>
-              <div className="space-y-2">
-                <label className="font-bold text-ink text-[16px]">{lang === 'zh' ? '网关访问密钥' : 'Gateway Access Token'}</label>
+            <form className="space-y-4" onSubmit={handleVerifyToken}>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-ink">{lang === 'zh' ? '网关访问密钥' : 'Gateway Access Token'}</label>
                 <CustomInput type="password" value={inputToken} onChange={setInputToken} placeholder={lang === 'zh' ? '输入你的安全密钥...' : 'Enter your security token...'} />
               </div>
               {authError && (
-                <div className="flex items-center gap-2 p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-semibold">
-                  <span className="material-symbols-outlined text-base">warning</span>{authError}
+                <div className="flex items-center gap-2 p-3 bg-toast-error/10 text-toast-error rounded-lg text-xs font-medium">
+                  <span className="material-symbols-outlined text-[16px]">warning</span>{authError}
                 </div>
               )}
-              <button className={`w-full font-bold py-4 rounded-full transition-all flex items-center justify-center group ${loginSuccess ? 'bg-mint text-ink' : 'bg-ink text-white hover:bg-primary'}`} type="submit" disabled={verifying}>
+              <button className={`w-full py-3 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm font-medium ${loginSuccess ? 'bg-mint text-white' : 'bg-ink text-white hover:bg-primary'} disabled:opacity-50`} type="submit" disabled={verifying}>
                 {verifying ? (
-                  <><svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Authenticating...</span></>
+                  <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>{lang === 'zh' ? '验证中...' : 'Verifying...'}</span></>
                 ) : loginSuccess ? (
-                  <><span className="material-symbols-outlined">check_circle</span><span className="ml-2">{lang === 'zh' ? '访问已授权' : 'Access Granted'}</span></>
+                  <><span className="material-symbols-outlined text-[18px]">check_circle</span><span>{lang === 'zh' ? '访问已授权' : 'Access Granted'}</span></>
                 ) : (
-                  <><span className="text-[15px]">{lang === 'zh' ? '验证密钥' : 'Verify Token'}</span><span className="material-symbols-outlined ml-2 transition-transform group-hover:translate-x-1">arrow_forward</span></>
+                  <><span>{lang === 'zh' ? '验证密钥' : 'Verify Token'}</span><span className="material-symbols-outlined text-[18px]">arrow_forward</span></>
                 )}
               </button>
             </form>
-            <button onClick={() => switchLang(lang === 'zh' ? 'en' : 'zh')} className="mt-4 w-full text-xs font-bold text-body hover:text-ink transition-colors">
+            <button onClick={() => switchLang(lang === 'zh' ? 'en' : 'zh')} className="mt-3 w-full text-xs text-body hover:text-ink transition-colors">
               {lang === 'zh' ? 'Switch to English' : '切换到中文'}
             </button>
-            <div className="mt-8 pt-6 border-t border-hairline flex flex-col items-center gap-4">
-              <div className="flex items-center gap-2 text-on-surface-variant"><span className="material-symbols-outlined text-[18px]">verified_user</span><p className="text-[13px]">End-to-end encrypted session</p></div>
-              <p className="text-[12px] text-on-surface-variant/70 text-center leading-relaxed">Access is restricted to authorized personnel. All connection attempts are logged and monitored.</p>
-            </div>
           </div>
-          <div className="mt-4 flex justify-between px-4 opacity-40">
-            <span className="text-[10px] tracking-widest text-ink uppercase">v2.4.0 stable</span>
-            <span className="text-[10px] tracking-widest text-ink uppercase">Status: Operational</span>
+          <div className="mt-4 flex justify-between px-2">
+            <span className="text-[10px] text-body">v2.4.0</span>
+            <span className="text-[10px] text-body flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-mint"></span>
+              {lang === 'zh' ? '运行中' : 'Operational'}
+            </span>
           </div>
         </main>
       </div>
@@ -888,123 +862,112 @@ export default function App() {
   }
 
   // ─── MAIN LAYOUT ───
-  const { bc, title } = pageMeta[activeTab]
+  const { title } = pageMeta[activeTab]
 
   return (
-    <div className="bg-surface min-h-screen relative">
-      <div ref={el => { orbRefs.current[2] = el }} className="orb bg-mint w-[500px] h-[500px] -top-24 -right-24"></div>
-      <div ref={el => { orbRefs.current[3] = el }} className="orb bg-peach w-[400px] h-[400px] bottom-0 left-[20%]"></div>
-
-      <aside ref={sidebarRef} className="fixed left-0 top-0 h-screen w-[280px] bg-surface border-r border-hairline flex flex-col p-6 z-50">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-ink rounded-lg flex items-center justify-center"><span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>gate</span></div>
-          <div><h1 className="font-display-sm text-ink leading-none">QoderGate</h1><p className="text-[10px] uppercase tracking-widest text-body opacity-60">{lang === 'zh' ? '管理控制台' : 'Management Console'}</p></div>
-        </div>
-        <nav className="flex-1 space-y-1">
-          {NAV_ITEMS.map((item) => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors font-medium w-full text-left ${activeTab === item.id ? 'bg-canvas-soft text-ink font-bold' : 'text-body hover:bg-canvas-soft'}`}>
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: activeTab === item.id ? "'FILL' 1" : "" }}>{item.icon}</span>{navLabels[item.id]}
+    <div className="bg-surface min-h-screen flex flex-col">
+      {/* Top bar - minimal */}
+      <header className="sticky top-0 z-40 bg-surface/80 backdrop-blur-md border-b border-hairline">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-ink rounded-lg flex items-center justify-center">
+              <span className="material-symbols-outlined text-white text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>gate</span>
+            </div>
+            <h1 className="font-display-sm text-ink">{title}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => switchLang(lang === 'zh' ? 'en' : 'zh')} className="px-3 py-1.5 text-xs font-medium text-body hover:text-ink hover:bg-canvas-soft rounded-lg transition-colors">
+              {lang === 'zh' ? 'EN' : '中文'}
             </button>
-          ))}
-        </nav>
-        <div className="pt-8 border-t border-hairline">
-          <div className="flex items-center justify-between px-3 py-2.5">
+            <a href="/documents" className="px-3 py-1.5 text-xs font-medium text-body hover:text-ink hover:bg-canvas-soft rounded-lg transition-colors">
+              {t.common.docs}
+            </a>
+            <div className="w-px h-5 bg-hairline mx-1"></div>
             <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${status.ready ? 'bg-mint animate-pulse' : 'bg-red-400'}`}></span>
-              <span className="text-xs font-semibold text-body">{status.ready ? t.common.healthy : t.common.offline}</span>
+              <span className={`w-2 h-2 rounded-full ${status.ready ? 'bg-mint' : 'bg-red-400'}`}></span>
+              <span className="text-xs text-body">{status.username || 'QoderGate'}</span>
             </div>
-            <button onClick={handleLogout} className="text-xs font-bold text-body hover:text-red-600 transition-colors">{t.common.signOut}</button>
+            <button onClick={handleLogout} className="p-1.5 text-body hover:text-red-600 transition-colors" title={t.common.signOut}>
+              <span className="material-symbols-outlined text-[18px]">logout</span>
+            </button>
           </div>
         </div>
-      </aside>
+      </header>
 
-      <main className="ml-[280px] min-h-screen flex flex-col relative z-10">
-        <header className="flex justify-between items-center h-24 px-8 w-full border-b border-hairline bg-transparent sticky top-0 z-40 backdrop-blur-sm">
-          <div>
-            <span className="text-[12px] font-semibold text-body uppercase opacity-60 tracking-[0.96px]">{bc}</span>
-            <h2 className="font-display-lg text-ink">{title}</h2>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-8 text-body text-[16px]">
-              <a href="/documents" className="hover:text-ink transition-colors cursor-pointer">{t.common.docs}</a>
-              <button onClick={() => switchLang(lang === 'zh' ? 'en' : 'zh')} className="hover:text-ink transition-colors cursor-pointer">{lang === 'zh' ? 'English' : '中文'}</button>
-              <a className="hover:text-ink transition-colors cursor-pointer">{t.common.support}</a>
-            </div>
-            <div className="flex items-center gap-4">
-              <button className="p-2 text-body hover:text-ink transition-colors"><span className="material-symbols-outlined">notifications</span></button>
-              <div className="w-10 h-10 rounded-full bg-hairline flex items-center justify-center border border-hairline-strong text-xs font-bold text-ink">{status.username ? status.username[0].toUpperCase() : 'Q'}</div>
-            </div>
-          </div>
-        </header>
-
-        <div ref={contentBodyRef} className="flex-1 p-8 w-full">
+      {/* Main content */}
+      <main className="flex-1 pb-24">
+        <div ref={contentBodyRef} className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
           {/* ─── DASHBOARD ─── */}
           {activeTab === 'dashboard' && (
-            <div className="space-y-8">
-              {/* 基础统计卡片 */}
-              <section ref={statCardsRef} className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {[
-                  { label: t.dashboard.serviceStatus, value: status.ready ? t.common.healthy : t.common.offline, detail: status.ready ? t.dashboard.allGatewaysActive : t.dashboard.noActiveSession, dot: status.ready ? 'bg-mint' : 'bg-red-400' },
-                  { label: t.dashboard.accountPool, value: String(status.accounts_count || 0), detail: t.dashboard.activeSessions },
-                  { label: t.dashboard.apiAuth, value: apiConfig.auth_required ? (lang === 'zh' ? '已开启' : 'Enabled') : (lang === 'zh' ? '未开启' : 'Disabled'), detail: apiConfig.auth_required ? `${apiConfig.allowed_keys.length} keys active` : t.dashboard.openAccess },
-                  { label: t.dashboard.activeUser, value: status.username || (lang === 'zh' ? '无' : 'None'), detail: status.user_type || 'N/A' }
-                ].map((stat, i) => (
-                  <div key={i} className="stat-card bg-surface-card border border-hairline p-6 rounded-xl hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)] transition-all cursor-default">
-                    <div className="text-[12px] font-semibold text-body mb-2 uppercase tracking-widest">{stat.label}</div>
-                    <div className="flex items-center gap-2"><span className="font-display-sm text-ink">{stat.value}</span>{stat.dot && <div className={`h-2 w-2 rounded-full ${stat.dot}`}></div>}</div>
-                    <div className="text-[12px] text-body mt-2">{stat.detail}</div>
-                  </div>
-                ))}
-              </section>
-
-              {/* 每日签到与福利胶囊 (Daily Check-in Banner) */}
+            <div className="space-y-6">
+              {/* KPI Row - 5 columns */}
               {(() => {
                 const campaigns = usageData?.campaigns?.campaigns || []
                 const targetC = campaigns.find((c: any) => c.actionType === 'CLAIM_BENEFIT') || campaigns[0]
                 const isClaimed = targetC?.claimStatus === 'CLAIMED'
+                const uq = usageData?.quota?.userQuota || { total: 300, used: 0, remaining: 300 }
+                const addOn = usageData?.quota?.addOnQuota || { remaining: 0 }
+
                 return (
-                  <section className="bg-gradient-to-r from-amber-500/10 via-primary/5 to-transparent border border-amber-500/20 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 shrink-0">
-                        <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>card_giftcard</span>
+                  <section ref={statCardsRef} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    {/* Service Status */}
+                    <div className="stat-card card p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-medium text-body uppercase tracking-wide">{t.dashboard.serviceStatus}</span>
+                        <span className={`w-2 h-2 rounded-full ${status.ready ? 'bg-mint' : 'bg-red-400'}`}></span>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-display-sm text-ink font-bold">每日签到福利 (Daily Check-in)</span>
-                          {isClaimed ? (
-                            <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-mint/15 text-mint border border-mint/30 flex items-center gap-1">
-                              <span className="material-symbols-outlined text-[14px]">check</span> 今日已领 100 Credits
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-amber-500/20 text-amber-600 border border-amber-500/40 animate-pulse">
-                              今日未签到 · 待领取
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-body text-xs mt-1">
-                          每日领取 100 通用算力额度（30天有效，每日 10:00 UTC+8 自动重置刷新）。后台守护每日 10:05 亦会自动巡检打卡。
-                        </div>
+                      <div className="text-lg font-semibold text-ink">{status.ready ? t.common.healthy : t.common.offline}</div>
+                      <div className="text-[11px] text-body mt-1">{status.ready ? t.dashboard.allGatewaysActive : t.dashboard.noActiveSession}</div>
+                    </div>
+
+                    {/* Account Pool */}
+                    <div className="stat-card card p-4">
+                      <div className="text-[11px] font-medium text-body uppercase tracking-wide mb-2">{t.dashboard.accountPool}</div>
+                      <div className="text-lg font-semibold text-ink">{status.accounts_count || 0}</div>
+                      <div className="text-[11px] text-body mt-1">{t.dashboard.activeSessions}</div>
+                    </div>
+
+                    {/* Plan Quota */}
+                    <div className="stat-card card p-4">
+                      <div className="text-[11px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '主配额' : 'Plan Quota'}</div>
+                      <div className="text-lg font-semibold text-ink">{uq.remaining}<span className="text-xs font-normal text-body">/{uq.total}</span></div>
+                      <div className="w-full bg-hairline h-1 rounded-full mt-2 overflow-hidden">
+                        <div className="bg-ink h-full rounded-full transition-all" style={{ width: `${Math.min(100, ((uq.used || 0) / (uq.total || 300)) * 100)}%` }}></div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
-                      <button
-                        onClick={handleClaimDaily}
-                        disabled={claiming || isClaimed}
-                        className={`w-full md:w-auto px-6 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${
-                          isClaimed
-                            ? 'bg-ink/10 text-body cursor-not-allowed border border-hairline'
-                            : 'bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20 active:scale-95'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[18px]">verified</span>
-                        {claiming ? '领取中...' : isClaimed ? '今日已打卡' : '立即打卡领 100 Credits'}
-                      </button>
+
+                    {/* Add-on Credits */}
+                    <div className="stat-card card p-4">
+                      <div className="text-[11px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '签到算力' : 'Add-on'}</div>
+                      <div className="text-lg font-semibold text-peach">{addOn.remaining}</div>
+                      <div className="text-[11px] text-body mt-1">{lang === 'zh' ? '30天滚动有效' : '30-day rolling'}</div>
+                    </div>
+
+                    {/* Daily Check-in */}
+                    <div className="stat-card card p-4 col-span-2 md:col-span-1">
+                      <div className="text-[11px] font-medium text-body uppercase tracking-wide mb-2">{lang === 'zh' ? '每日签到' : 'Check-in'}</div>
+                      {isClaimed ? (
+                        <div className="flex items-center gap-1.5 text-mint">
+                          <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                          <span className="text-sm font-medium">{lang === 'zh' ? '已领 100' : 'Claimed'}</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleClaimDaily}
+                          disabled={claiming}
+                          className="w-full px-3 py-1.5 bg-peach text-white text-xs font-medium rounded-lg hover:bg-peach/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">card_giftcard</span>
+                          {claiming ? '...' : (lang === 'zh' ? '打卡领取' : 'Claim')}
+                        </button>
+                      )}
+                      <div className="text-[11px] text-body mt-1.5">{lang === 'zh' ? '每日 10:05 自动' : 'Auto at 10:05'}</div>
                     </div>
                   </section>
                 )
               })()}
 
-              {/* 用量与额度分析三栏 (Usage Analytics) */}
+              {/* Usage Analytics - 3 columns compact */}
               {(() => {
                 const uq = usageData?.quota?.userQuota || { total: 300, used: 1, remaining: 299, percentage: 0.01 }
                 const addOn = usageData?.quota?.addOnQuota || { total: 100, remaining: 100, used: 0 }
@@ -1013,68 +976,56 @@ export default function App() {
                 const usedPct = Math.min(100, Math.round(((uq.used || 0) / (uq.total || 300)) * 100))
 
                 return (
-                  <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* 主套餐配额 */}
-                    <div className="bg-surface-card border border-hairline p-6 rounded-2xl flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between text-body text-xs font-semibold uppercase tracking-wider mb-2">
-                          <span>主套餐月度配额 (Plan Quota)</span>
-                          <span className="text-primary font-bold">{usedPct}% 已用</span>
-                        </div>
-                        <div className="flex items-baseline gap-2 mb-3">
-                          <span className="font-display-md text-ink font-bold">{uq.remaining}</span>
-                          <span className="text-body text-xs font-medium">/ {uq.total} Credits 剩余</span>
-                        </div>
-                        <div className="w-full bg-ink/10 h-2.5 rounded-full overflow-hidden">
-                          <div className="bg-primary h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(4, usedPct)}%` }}></div>
-                        </div>
+                  <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* Plan Quota Detail */}
+                    <div className="card p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-medium text-body">{lang === 'zh' ? '主套餐月度配额' : 'Plan Quota'}</span>
+                        <span className="text-xs font-semibold text-ink">{usedPct}%</span>
                       </div>
-                      <div className="text-[12px] text-body mt-4 pt-3 border-t border-hairline flex justify-between">
-                        <span>已消耗：{uq.used} Credits</span>
-                        <span className="text-mint font-semibold">状态良好</span>
+                      <div className="flex items-baseline gap-1.5 mb-3">
+                        <span className="text-2xl font-semibold text-ink">{uq.remaining}</span>
+                        <span className="text-xs text-body">/ {uq.total} Credits</span>
+                      </div>
+                      <div className="w-full bg-hairline h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-ink h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(2, usedPct)}%` }}></div>
+                      </div>
+                      <div className="flex justify-between mt-3 text-[11px] text-body">
+                        <span>{lang === 'zh' ? '已用' : 'Used'}: {uq.used}</span>
+                        <span className="text-mint font-medium">{lang === 'zh' ? '状态良好' : 'Healthy'}</span>
                       </div>
                     </div>
 
-                    {/* 每日签到算力池 */}
-                    <div className="bg-surface-card border border-hairline p-6 rounded-2xl flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between text-body text-xs font-semibold uppercase tracking-wider mb-2">
-                          <span>通用签到算力 (Add-on Credits)</span>
-                          <span className="text-amber-500 font-bold">30 天滚动</span>
-                        </div>
-                        <div className="flex items-baseline gap-2 mb-3">
-                          <span className="font-display-md text-amber-600 font-bold">{addOn.remaining}</span>
-                          <span className="text-body text-xs font-medium">Credits 算力在池</span>
-                        </div>
-                        <div className="text-xs text-body leading-relaxed">
-                          每日签到赠送的独立算力池，优先级最高抵扣。每日持续打卡即可源源不断储备算力。
-                        </div>
+                    {/* Add-on Credits */}
+                    <div className="card p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-medium text-body">{lang === 'zh' ? '通用签到算力' : 'Add-on Credits'}</span>
+                        <span className="text-xs font-semibold text-peach">{lang === 'zh' ? '30天滚动' : '30-day'}</span>
                       </div>
-                      <div className="text-[12px] text-body mt-4 pt-3 border-t border-hairline flex justify-between">
-                        <span>通用全模型抵扣</span>
-                        <span className="text-amber-600 font-semibold">有效累计中</span>
+                      <div className="flex items-baseline gap-1.5 mb-3">
+                        <span className="text-2xl font-semibold text-peach">{addOn.remaining}</span>
+                        <span className="text-xs text-body">Credits</span>
                       </div>
+                      <p className="text-[11px] text-body leading-relaxed">
+                        {lang === 'zh' ? '每日签到赠送，优先级最高抵扣，持续打卡储备算力。' : 'Daily check-in reward, highest priority deduction.'}
+                      </p>
                     </div>
 
-                    {/* 账号生命周期与类型 */}
-                    <div className="bg-surface-card border border-hairline p-6 rounded-2xl flex flex-col justify-between">
-                      <div>
-                        <div className="text-body text-xs font-semibold uppercase tracking-wider mb-2">
-                          账号权限与有效期 (Account Plan)
-                        </div>
-                        <div className="font-display-sm text-ink font-bold mb-1">
-                          {userType === 'personal_professional_trial' ? '个人专业试用版' : userType}
-                        </div>
-                        <div className="text-xs text-body leading-relaxed mt-2">
-                          当前有效期至：<span className="font-mono font-bold text-ink">{expiresAt}</span>
-                        </div>
+                    {/* Account Plan */}
+                    <div className="card p-5">
+                      <div className="text-xs font-medium text-body mb-3">{lang === 'zh' ? '账号权限与有效期' : 'Account Plan'}</div>
+                      <div className="text-sm font-semibold text-ink mb-2">
+                        {userType === 'personal_professional_trial' ? (lang === 'zh' ? '个人专业试用版' : 'Pro Trial') : userType}
                       </div>
-                      <div className="text-[12px] text-body mt-4 pt-3 border-t border-hairline flex justify-between items-center">
-                        <span className="text-mint flex items-center gap-1 font-semibold">
-                          <span className="h-2 w-2 rounded-full bg-mint"></span> 正常轮转中
+                      <div className="text-[11px] text-body mb-3">
+                        {lang === 'zh' ? '有效期至' : 'Valid until'}: <span className="font-mono font-medium text-ink">{expiresAt}</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-3 border-t border-hairline">
+                        <span className="flex items-center gap-1 text-[11px] text-mint font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-mint"></span> {lang === 'zh' ? '正常轮转' : 'Active'}
                         </span>
-                        <button onClick={fetchUsageOverview} className="text-xs text-primary hover:underline font-semibold flex items-center gap-0.5">
-                          <span className="material-symbols-outlined text-[14px]">sync</span> 刷新用量
+                        <button onClick={fetchUsageOverview} className="text-[11px] text-body hover:text-ink flex items-center gap-0.5 transition-colors">
+                          <span className="material-symbols-outlined text-[14px]">sync</span> {lang === 'zh' ? '刷新' : 'Refresh'}
                         </button>
                       </div>
                     </div>
@@ -1082,132 +1033,96 @@ export default function App() {
                 )
               })()}
 
-              {/* 客户端极简连接向导 (CC-Switch / CherryStudio / NextChat) */}
-              <section className="bg-surface-card border border-hairline p-6 rounded-2xl">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-hairline">
-                  <div>
-                    <div className="text-xs font-semibold text-primary uppercase tracking-widest mb-1 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[16px]">devices</span> 客户端极简接入向导 (Client Integration)
-                    </div>
-                    <div className="text-sm font-bold text-ink">
-                      支持 cc-switch、CherryStudio、NextChat、Claude Code、Cursor 开箱即用
-                    </div>
+              {/* Client Integration - compact */}
+              <section className="card p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-body">devices</span>
+                    <span className="text-sm font-medium text-ink">{lang === 'zh' ? '客户端接入' : 'Client Integration'}</span>
                   </div>
                   <div className="flex gap-2">
-                    <span className="px-3 py-1 bg-mint/10 text-mint text-xs font-bold rounded-lg border border-mint/20 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">bolt</span> 100万Token (1M) 极限上下文已就绪
+                    <span className="px-2 py-0.5 bg-mint-soft text-mint text-[10px] font-medium rounded flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[12px]">bolt</span> 1M Context
                     </span>
-                    <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-lg border border-primary/20 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">psychology</span> 默认最高思考强度 (xhigh / max)
+                    <span className="px-2 py-0.5 bg-sky-soft text-sky text-[10px] font-medium rounded flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[12px]">psychology</span> xhigh/max
                     </span>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <div className="bg-canvas-soft p-4 rounded-xl border border-hairline flex items-center justify-between">
-                    <div className="min-w-0 pr-3">
-                      <div className="text-[11px] font-bold text-body uppercase tracking-wider">API Base URL (端点地址)</div>
-                      <div className="text-sm font-mono font-bold text-ink truncate mt-0.5">http://192.168.31.172:5050/v1</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="card-soft p-3 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-body uppercase tracking-wide">Base URL</div>
+                      <div className="text-xs font-mono text-ink truncate mt-0.5">http://192.168.31.172:5050/v1</div>
                     </div>
                     <button
-                      onClick={() => {
-                        navigator.clipboard.writeText('http://192.168.31.172:5050/v1')
-                        pushToast('SUCCESS', '已复制 Base URL', 'http://192.168.31.172:5050/v1')
-                      }}
-                      className="px-3 py-1.5 bg-white border border-hairline rounded-lg text-xs font-bold text-ink hover:bg-ink hover:text-white transition-all shrink-0 flex items-center gap-1"
+                      onClick={() => { navigator.clipboard.writeText('http://192.168.31.172:5050/v1'); pushToast('SUCCESS', lang === 'zh' ? '已复制' : 'Copied', 'Base URL') }}
+                      className="p-1.5 text-body hover:text-ink hover:bg-hairline rounded transition-colors shrink-0"
                     >
-                      <span className="material-symbols-outlined text-[14px]">content_copy</span> 复制
+                      <span className="material-symbols-outlined text-[16px]">content_copy</span>
                     </button>
                   </div>
-
-                  <div className="bg-canvas-soft p-4 rounded-xl border border-hairline flex items-center justify-between">
-                    <div className="min-w-0 pr-3">
-                      <div className="text-[11px] font-bold text-body uppercase tracking-wider">Gateway API Key (授权密钥)</div>
-                      <div className="text-sm font-mono font-bold text-ink truncate mt-0.5">
-                        {apiConfig.allowed_keys[0] || 'qg_live_ecebc5191dfda64a659f8be78cd5db00'}
-                      </div>
+                  <div className="card-soft p-3 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-body uppercase tracking-wide">API Key</div>
+                      <div className="text-xs font-mono text-ink truncate mt-0.5">{apiConfig.allowed_keys[0] || 'qg_live_***'}</div>
                     </div>
                     <button
-                      onClick={() => {
-                        const key = apiConfig.allowed_keys[0] || 'qg_live_ecebc5191dfda64a659f8be78cd5db00'
-                        navigator.clipboard.writeText(key)
-                        pushToast('SUCCESS', '已复制 API Key', key)
-                      }}
-                      className="px-3 py-1.5 bg-white border border-hairline rounded-lg text-xs font-bold text-ink hover:bg-ink hover:text-white transition-all shrink-0 flex items-center gap-1"
+                      onClick={() => { const key = apiConfig.allowed_keys[0] || ''; navigator.clipboard.writeText(key); pushToast('SUCCESS', lang === 'zh' ? '已复制' : 'Copied', 'API Key') }}
+                      className="p-1.5 text-body hover:text-ink hover:bg-hairline rounded transition-colors shrink-0"
                     >
-                      <span className="material-symbols-outlined text-[14px]">content_copy</span> 复制
+                      <span className="material-symbols-outlined text-[16px]">content_copy</span>
                     </button>
                   </div>
                 </div>
               </section>
 
-              {/* 大模型矩阵全景实验室 (11 款大模型) */}
-              <section className="bg-surface-card border border-hairline p-6 rounded-2xl">
+              {/* Model Matrix Hub */}
+              <section className="card p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <div className="text-xs font-semibold text-body uppercase tracking-widest mb-1">
-                      大模型矩阵全景看板 (Model Matrix Hub)
-                    </div>
-                    <div className="text-sm font-bold text-ink">
-                      当前支持 11 款大模型，均已放开 1M 上下文与极致推理档位，点击可复制模型 ID
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-body">hub</span>
+                    <span className="text-sm font-medium text-ink">{lang === 'zh' ? '模型矩阵' : 'Model Matrix'}</span>
+                    <span className="text-[11px] text-body">11 {lang === 'zh' ? '款可用' : 'available'}</span>
                   </div>
-                  <span className="text-xs font-bold text-body bg-canvas-soft px-3 py-1.5 rounded-lg border border-hairline">
-                    共 11 个可用模型
-                  </span>
+                  <span className="text-[10px] text-body">{lang === 'zh' ? '点击复制 ID' : 'Click to copy'}</span>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {AVAILABLE_MODELS.map(m => (
                     <div
                       key={m.id}
-                      onClick={() => {
-                        navigator.clipboard.writeText(m.id)
-                        pushToast('SUCCESS', '已复制模型 ID', m.id)
-                      }}
-                      className="group p-4 bg-canvas-soft hover:bg-white border border-hairline hover:border-primary/40 rounded-xl transition-all cursor-pointer relative hover:shadow-md"
+                      onClick={() => { navigator.clipboard.writeText(m.id); pushToast('SUCCESS', lang === 'zh' ? '已复制' : 'Copied', m.id) }}
+                      className="card-soft p-3 hover:bg-hairline/50 transition-colors cursor-pointer group"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm text-ink group-hover:text-primary transition-colors">{m.name}</span>
-                            {m.free && (
-                              <span className="px-1.5 py-0.5 bg-mint/20 text-mint text-[10px] font-bold rounded">
-                                0扣费
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-body mt-0.5">{m.desc}</div>
-                        </div>
-                        <span className="material-symbols-outlined text-body/30 group-hover:text-primary text-[18px] transition-colors shrink-0">
-                          content_copy
-                        </span>
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-xs font-medium text-ink truncate">{m.name}</span>
+                        {m.free && <span className="px-1.5 py-0.5 bg-mint-soft text-mint text-[9px] font-medium rounded shrink-0">FREE</span>}
                       </div>
-
-                      <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-hairline/60 text-[11px] font-mono">
-                        <span className="px-2 py-0.5 rounded bg-ink/5 text-ink font-semibold">{m.context}</span>
-                        <span className="px-2 py-0.5 rounded bg-primary/10 text-primary font-bold">思考: {m.effort}</span>
-                        <span className="text-body ml-auto">{m.price}</span>
+                      <div className="text-[10px] text-body line-clamp-1 mb-2">{m.desc}</div>
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <span className="px-1.5 py-0.5 bg-hairline text-ink rounded font-mono">{m.context}</span>
+                        <span className="px-1.5 py-0.5 bg-sky-soft text-sky rounded font-mono">{m.effort}</span>
+                        <span className="text-body ml-auto font-mono">{m.price}</span>
                       </div>
                     </div>
                   ))}
                 </div>
               </section>
 
-              {/* 凭据导入管理 */}
-              <section className="bg-surface-card border border-hairline p-8 rounded-2xl">
-                <div className="text-[12px] font-semibold text-body mb-2 uppercase tracking-widest">{t.dashboard.credentialConfig}</div>
-                <p className="text-body text-[16px] mb-6">{t.dashboard.credentialDesc}</p>
-                <div className="flex flex-col sm:flex-row gap-4 max-w-2xl">
+              {/* Credential Config */}
+              <section className="card p-5">
+                <div className="text-xs font-medium text-body mb-1">{t.dashboard.credentialConfig}</div>
+                <p className="text-xs text-body mb-4">{t.dashboard.credentialDesc}</p>
+                <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex-grow">
                     <CustomInput type="password" value={patToken} onChange={setPatToken} placeholder={t.dashboard.patPlaceholder} />
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={handleSavePat} disabled={submittingPat} className="bg-ink text-white font-bold px-5 py-3 rounded-lg text-sm transition-all hover:bg-primary disabled:opacity-50">
+                    <button onClick={handleSavePat} disabled={submittingPat} className="px-4 py-2.5 bg-ink text-white text-sm font-medium rounded-lg hover:bg-primary transition-colors disabled:opacity-50">
                       {submittingPat ? t.dashboard.saving : t.dashboard.addPat}
                     </button>
-                    <button onClick={handleImportAuth} className="flex items-center gap-2 px-4 py-3 text-ink hover:bg-canvas-soft border border-hairline font-semibold rounded-lg text-sm transition-all">
-                      <span className="material-symbols-outlined text-[18px]">refresh</span>{t.dashboard.autoImport}
+                    <button onClick={handleImportAuth} className="px-4 py-2.5 text-ink border border-hairline text-sm font-medium rounded-lg hover:bg-canvas-soft transition-colors flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">refresh</span>{t.dashboard.autoImport}
                     </button>
                   </div>
                 </div>
@@ -1217,71 +1132,73 @@ export default function App() {
 
           {/* ─── ACCOUNT POOL ─── */}
           {activeTab === 'accounts' && (
-            <div className="space-y-8">
-              <section className="flex justify-between items-end flex-wrap gap-4">
-                <div className="max-w-xl"><p className="text-body text-[16px]">{t.accounts.desc}</p></div>
-                <div className="flex gap-4 flex-wrap">
-                  <button onClick={() => { setShowBatchImport(v => !v); setQuotaList(null) }} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all font-bold text-sm border ${showBatchImport ? 'bg-ink text-white border-ink' : 'text-body hover:text-ink border-hairline'}`}>
-                    <span className="material-symbols-outlined text-[18px]">file_upload</span>{lang === 'zh' ? '批量导入' : 'Batch Import'}
+            <div className="space-y-5">
+              {/* Toolbar */}
+              <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p className="text-xs text-body">{t.accounts.desc}</p>
+                <div className="flex gap-2 flex-wrap">
+                  <button onClick={() => { setShowBatchImport(v => !v); setQuotaList(null) }} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors border ${showBatchImport ? 'bg-ink text-white border-ink' : 'text-body border-hairline hover:text-ink hover:bg-canvas-soft'}`}>
+                    <span className="material-symbols-outlined text-[16px]">file_upload</span>{lang === 'zh' ? '批量导入' : 'Batch Import'}
                   </button>
-                  <button onClick={doRefreshTokens} disabled={refreshingTokens} className="flex items-center gap-2 px-4 py-2.5 text-body hover:text-ink transition-colors font-bold text-sm disabled:opacity-40">
-                    <span className="material-symbols-outlined text-[18px]">autorenew</span>{refreshingTokens ? (lang === 'zh' ? '刷新中...' : 'Refreshing...') : (lang === 'zh' ? '刷新 Token' : 'Refresh Tokens')}
+                  <button onClick={doRefreshTokens} disabled={refreshingTokens} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-body hover:text-ink hover:bg-canvas-soft transition-colors disabled:opacity-40">
+                    <span className="material-symbols-outlined text-[16px]">autorenew</span>{refreshingTokens ? (lang === 'zh' ? '刷新中...' : 'Refreshing...') : (lang === 'zh' ? '刷新 Token' : 'Refresh Tokens')}
                   </button>
-                  <button onClick={() => { loadQuota(); setShowBatchImport(false) }} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all font-bold text-sm border ${quotaList ? 'bg-ink text-white border-ink' : 'text-body hover:text-ink border-hairline'}`}>
-                    <span className="material-symbols-outlined text-[18px]">data_usage</span>{lang === 'zh' ? '查看限额' : 'Quota'}
+                  <button onClick={() => { loadQuota(); setShowBatchImport(false) }} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors border ${quotaList ? 'bg-ink text-white border-ink' : 'text-body border-hairline hover:text-ink hover:bg-canvas-soft'}`}>
+                    <span className="material-symbols-outlined text-[16px]">data_usage</span>{lang === 'zh' ? '查看限额' : 'Quota'}
                   </button>
-                  <button onClick={handleRefreshStatus} className="flex items-center gap-2 px-4 py-2.5 text-body hover:text-ink transition-colors font-bold text-sm">
-                    <span className="material-symbols-outlined text-[18px]">refresh</span>{t.accounts.refreshStatus}
+                  <button onClick={handleRefreshStatus} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-body hover:text-ink hover:bg-canvas-soft transition-colors">
+                    <span className="material-symbols-outlined text-[16px]">refresh</span>{t.accounts.refreshStatus}
                   </button>
-                  <button onClick={handleImportAuth} className="flex items-center gap-2 px-6 py-2.5 bg-ink text-white rounded-lg hover:bg-neutral-800 transition-all font-bold text-sm shadow-md">
-                    <span className="material-symbols-outlined text-[18px]">add</span>{t.accounts.importAccounts}
+                  <button onClick={handleImportAuth} className="flex items-center gap-1.5 px-4 py-2 bg-ink text-white rounded-lg hover:bg-primary transition-colors text-xs font-medium">
+                    <span className="material-symbols-outlined text-[16px]">add</span>{t.accounts.importAccounts}
                   </button>
                 </div>
               </section>
 
               {showBatchImport && (
-                <section className="bg-surface-card border border-hairline rounded-2xl p-6">
-                  <label className="text-[12px] font-semibold text-body mb-3 block uppercase tracking-widest">{lang === 'zh' ? '粘贴注册机导出的 JSON（accounts.json）' : 'Paste registrar-exported JSON (accounts.json)'}</label>
+                <section className="card p-5">
+                  <label className="text-xs font-medium text-body mb-2 block">{lang === 'zh' ? '粘贴注册机导出的 JSON（accounts.json）' : 'Paste registrar-exported JSON (accounts.json)'}</label>
                   <textarea
                     value={batchJson}
                     onChange={e => setBatchJson(e.target.value)}
                     rows={6}
                     placeholder='[{ "user_id": "019f...", "name": "...", "email": "...", "token": "dt-...", "refresh_token": "drt-...", "expires_at": "..." }]'
-                    className="w-full p-4 rounded-xl border border-hairline bg-white/60 font-mono text-[13px] text-ink outline-none focus:border-ink/30 transition-colors"
+                    className="w-full p-3 rounded-lg border border-hairline bg-canvas-soft font-mono text-xs text-ink outline-none focus:border-hairline-strong focus:bg-white transition-colors"
                   />
-                  <div className="mt-3 flex gap-3">
-                    <button onClick={doBatchImport} className="bg-ink text-white font-bold px-6 py-2.5 rounded-lg text-sm transition-all hover:bg-neutral-800">{lang === 'zh' ? '导入' : 'Import'}</button>
-                    <button onClick={() => { setBatchJson(''); setShowBatchImport(false) }} className="px-4 py-2.5 text-body border border-hairline rounded-lg text-sm font-bold hover:text-ink">{lang === 'zh' ? '取消' : 'Cancel'}</button>
+                  <div className="mt-3 flex gap-2">
+                    <button onClick={doBatchImport} className="bg-ink text-white font-medium px-4 py-2 rounded-lg text-xs hover:bg-primary transition-colors">{lang === 'zh' ? '导入' : 'Import'}</button>
+                    <button onClick={() => { setBatchJson(''); setShowBatchImport(false) }} className="px-4 py-2 text-body border border-hairline rounded-lg text-xs font-medium hover:text-ink hover:bg-canvas-soft transition-colors">{lang === 'zh' ? '取消' : 'Cancel'}</button>
                   </div>
                 </section>
               )}
 
               {quotaList && (
-                <section className="bg-surface-card border border-hairline rounded-2xl overflow-hidden">
-                  <div className="px-6 py-4 border-b border-hairline flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[18px] text-body">data_usage</span>
-                    <span className="text-sm font-semibold text-ink">{lang === 'zh' ? '账号限额（credits）' : 'Account Quota (credits)'}</span>
-                    <button onClick={loadQuota} className="ml-auto text-[12px] text-body hover:text-ink flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">refresh</span>{lang === 'zh' ? '刷新' : 'Refresh'}</button>
+                <section className="card overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-hairline flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-body">data_usage</span>
+                    <span className="text-xs font-medium text-ink">{lang === 'zh' ? '账号限额（Credits）' : 'Account Quota (Credits)'}</span>
+                    <button onClick={loadQuota} className="ml-auto text-[11px] text-body hover:text-ink flex items-center gap-1 transition-colors"><span className="material-symbols-outlined text-[14px]">refresh</span>{lang === 'zh' ? '刷新' : 'Refresh'}</button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                      <thead className="bg-canvas-soft border-b border-hairline">
-                        <tr>{['Account', 'Total', 'Used', 'Remaining', 'Usage %'].map((h, i) => (
-                          <th key={i} className="px-6 py-3 text-[10px] font-semibold text-body uppercase tracking-wider">{h}</th>
+                      <thead>
+                        <tr className="border-b border-hairline">{['Account', 'Total', 'Used', 'Remaining', 'Usage'].map((h, i) => (
+                          <th key={i} className="px-5 py-2.5 text-[10px] font-medium text-body uppercase tracking-wide">{h}</th>
                         ))}</tr>
                       </thead>
                       <tbody className="divide-y divide-hairline">
                         {quotaList.map((q, i) => {
                           const uq = q.quota?.userQuota || {}
+                          const pct = Math.min(100, (uq.percentage || 0) * 100)
                           return (
                             <tr key={i} className="hover:bg-canvas-soft transition-colors">
-                              <td className="px-6 py-4 font-semibold text-ink">{q.name || q.uid.slice(0, 12)}</td>
-                              <td className="px-6 py-4 font-mono text-xs text-body">{uq.total ?? '--'}</td>
-                              <td className="px-6 py-4 font-mono text-xs text-body">{uq.used ?? '--'}</td>
-                              <td className={`px-6 py-4 font-mono text-xs ${uq.percentage > 0.8 ? 'text-red-600 font-bold' : 'text-body'}`}>{uq.remaining ?? '--'}</td>
-                              <td className="px-6 py-4">
-                                <div className="w-24 h-1.5 bg-hairline-strong rounded-full overflow-hidden">
-                                  <div className={`h-full ${(uq.percentage || 0) > 0.8 ? 'bg-red-500' : 'bg-mint'}`} style={{ width: `${Math.min(100, (uq.percentage || 0) * 100)}%` }} />
+                              <td className="px-5 py-3 text-xs font-medium text-ink">{q.name || q.uid.slice(0, 12)}</td>
+                              <td className="px-5 py-3 font-mono text-xs text-body">{uq.total ?? '--'}</td>
+                              <td className="px-5 py-3 font-mono text-xs text-body">{uq.used ?? '--'}</td>
+                              <td className={`px-5 py-3 font-mono text-xs ${pct > 80 ? 'text-toast-error font-medium' : 'text-body'}`}>{uq.remaining ?? '--'}</td>
+                              <td className="px-5 py-3">
+                                <div className="w-24 h-1.5 bg-hairline rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full ${pct > 80 ? 'bg-toast-error' : 'bg-mint'}`} style={{ width: `${pct}%` }} />
                                 </div>
                               </td>
                             </tr>
@@ -1294,48 +1211,63 @@ export default function App() {
                 </section>
               )}
 
-              <section className="flex items-center gap-6">
-                <div className="relative flex-grow max-w-md group">
-                  <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-body opacity-50 group-focus-within:opacity-100 transition-opacity">search</span>
-                  <CustomInput value={searchAccounts} onChange={setSearchAccounts} placeholder={t.accounts.search} className="!pl-12 !py-3 !rounded-xl !bg-white/50" />
-                </div>
-              </section>
+              {/* Search */}
+              <div className="relative max-w-sm">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-body text-[18px]">search</span>
+                <input
+                  value={searchAccounts}
+                  onChange={e => setSearchAccounts(e.target.value)}
+                  placeholder={t.accounts.search}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-hairline rounded-xl text-sm text-ink outline-none focus:border-hairline-strong transition-colors placeholder:text-body/50"
+                />
+              </div>
 
-              <section className="glass-card rounded-2xl overflow-hidden shadow-sm">
+              {/* Accounts table */}
+              <section className="card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
-                    <thead className="bg-canvas-soft border-b border-hairline">
-                      <tr>{['Account', 'UID', 'Plan / Quota', 'Status', 'Reset', 'Enabled', 'Actions'].map((h, i) => (
-                        <th key={i} className={`px-6 py-4 text-[10px] font-semibold text-body uppercase tracking-wider ${i === 5 ? 'text-center' : ''}`}>{h}</th>
+                    <thead>
+                      <tr className="border-b border-hairline bg-canvas-soft">{['Account', 'UID', 'Plan / Quota', 'Status', 'Reset', 'Enabled', 'Actions'].map((h, i) => (
+                        <th key={i} className={`px-5 py-3 text-[10px] font-medium text-body uppercase tracking-wide ${i === 5 ? 'text-center' : ''}`}>{h}</th>
                       ))}</tr>
                     </thead>
                     <tbody className="divide-y divide-hairline">
                       {accountsConfig.accounts.length === 0 ? (
-                        <tr><td colSpan={7} className="py-8 text-center text-xs text-body font-medium">{t.accounts.empty}</td></tr>
+                        <tr><td colSpan={7} className="py-10 text-center text-xs text-body">{t.accounts.empty}</td></tr>
                       ) : accountsConfig.accounts
                         .filter(acc => !searchAccounts || acc.name.toLowerCase().includes(searchAccounts.toLowerCase()) || acc.uid.includes(searchAccounts))
                         .map((acc) => {
                           const isActive = accountsConfig.active_uid === acc.uid
                           return (
-                            <tr key={acc.uid} className={`hover:bg-canvas-soft transition-colors group ${isActive ? 'bg-mint/5' : ''}`}>
-                              <td className="px-6 py-5 font-bold text-ink"><div className="flex items-center gap-2">{acc.name}{isActive && <span className="text-[9px] bg-mint/20 text-ink px-1.5 py-0.5 rounded font-extrabold uppercase">Active</span>}</div></td>
-                              <td className="px-6 py-5 font-mono text-xs text-body select-all">{acc.uid}</td>
-                              <td className="px-6 py-5"><div className="flex flex-col"><span className="text-xs font-semibold text-ink">{acc.user_tag || acc.plan || 'Trial'}</span><span className="text-[10px] text-body font-mono">Quota: {acc.quota}</span></div></td>
-                              <td className="px-6 py-5">
-                                {acc.is_quota_exceeded ? <span className="px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider bg-red-100 text-red-700">Exceeded</span>
-                                : acc.last_status === 'ok' ? <span className="px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider bg-mint/20 text-ink">Enabled</span>
-                                : <span className="px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider bg-red-100 text-red-700" title={acc.last_error || ''}>Error</span>}
+                            <tr key={acc.uid} className={`hover:bg-canvas-soft transition-colors group ${isActive ? 'bg-mint-soft/30' : ''}`}>
+                              <td className="px-5 py-4">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium text-ink">{acc.name}</span>
+                                  {isActive && <span className="text-[9px] bg-mint text-white px-1.5 py-0.5 rounded font-medium">Active</span>}
+                                </div>
                               </td>
-                              <td className="px-6 py-5 text-xs font-mono text-body">{acc.next_reset_at ? new Date(acc.next_reset_at).toLocaleDateString() : '--'}</td>
-                              <td className="px-6 py-5 text-center">
-                                <button onClick={() => handleToggleAccount(acc.uid, !acc.enabled)} className={`w-11 h-6 rounded-full p-0.5 transition-colors relative ${acc.enabled ? 'bg-ink' : 'bg-hairline-strong'}`}>
-                                  <div className={`w-5 h-5 bg-white rounded-full transition-transform duration-200 ${acc.enabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                              <td className="px-5 py-4 font-mono text-[11px] text-body select-all">{acc.uid}</td>
+                              <td className="px-5 py-4">
+                                <div className="flex flex-col">
+                                  <span className="text-xs text-ink">{acc.user_tag || acc.plan || 'Trial'}</span>
+                                  <span className="text-[10px] text-body font-mono">Quota: {acc.quota}</span>
+                                </div>
+                              </td>
+                              <td className="px-5 py-4">
+                                {acc.is_quota_exceeded ? <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-toast-error/10 text-toast-error">Exceeded</span>
+                                : acc.last_status === 'ok' ? <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-mint-soft text-mint">OK</span>
+                                : <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-toast-error/10 text-toast-error" title={acc.last_error || ''}>Error</span>}
+                              </td>
+                              <td className="px-5 py-4 text-xs font-mono text-body">{acc.next_reset_at ? new Date(acc.next_reset_at).toLocaleDateString() : '--'}</td>
+                              <td className="px-5 py-4 text-center">
+                                <button onClick={() => handleToggleAccount(acc.uid, !acc.enabled)} className={`w-10 h-5.5 rounded-full p-0.5 transition-colors relative ${acc.enabled ? 'bg-ink' : 'bg-hairline-strong'}`}>
+                                  <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${acc.enabled ? 'translate-x-4.5' : 'translate-x-0'}`}></div>
                                 </button>
                               </td>
-                              <td className="px-6 py-5 text-right">
-                                <div className="flex items-center justify-end gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => handleSelectAccount(acc.uid)} disabled={isActive || !acc.enabled} className="text-body hover:text-ink disabled:opacity-30" title="Activate"><span className="material-symbols-outlined">play_circle</span></button>
-                                  <button onClick={() => handleDeleteAccount(acc.uid)} className="text-body hover:text-red-600" title="Delete"><span className="material-symbols-outlined">delete</span></button>
+                              <td className="px-5 py-4 text-right">
+                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => handleSelectAccount(acc.uid)} disabled={isActive || !acc.enabled} className="p-1.5 text-body hover:text-ink hover:bg-hairline rounded-lg disabled:opacity-30 transition-colors" title="Activate"><span className="material-symbols-outlined text-[18px]">play_circle</span></button>
+                                  <button onClick={() => handleDeleteAccount(acc.uid)} className="p-1.5 text-body hover:text-toast-error hover:bg-toast-error/10 rounded-lg transition-colors" title="Delete"><span className="material-symbols-outlined text-[18px]">delete</span></button>
                                 </div>
                               </td>
                             </tr>
@@ -1344,8 +1276,8 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
-                <div className="px-6 py-5 flex items-center justify-between border-t border-hairline bg-canvas-soft/20">
-                  <p className="text-[11px] text-body uppercase tracking-wider">{t.accounts.showing.replace('{count}', String(accountsConfig.accounts.length))}</p>
+                <div className="px-5 py-3 border-t border-hairline bg-canvas-soft">
+                  <p className="text-[11px] text-body">{t.accounts.showing.replace('{count}', String(accountsConfig.accounts.length))}</p>
                 </div>
               </section>
             </div>
@@ -1353,34 +1285,55 @@ export default function App() {
 
           {/* ─── AI PLAYGROUND ─── */}
           {activeTab === 'playground' && (
-            <div className="flex gap-8 h-[calc(100vh-14rem)]">
-              <section className="w-[320px] flex flex-col gap-6 overflow-y-auto pr-4">
-                <div className="space-y-3">
-                  <label className="font-bold text-ink">{t.playground.modelConfig}</label>
-                  <CustomInput value={model} onChange={setModel} placeholder="e.g. lite, pro" />
+            <div className="flex flex-col lg:flex-row gap-5 h-[calc(100vh-10rem)]">
+              {/* Config sidebar */}
+              <aside className="w-full lg:w-[280px] flex flex-col gap-4 shrink-0">
+                <div className="card p-4">
+                  <label className="text-xs font-medium text-body block mb-2">{t.playground.modelConfig}</label>
+                  <select
+                    value={model}
+                    onChange={e => setModel(e.target.value)}
+                    className="w-full px-3 py-2 bg-canvas-soft border border-hairline rounded-lg text-sm text-ink outline-none focus:border-hairline-strong transition-colors cursor-pointer"
+                  >
+                    {AVAILABLE_MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                  <div className="text-[10px] text-body mt-1.5 font-mono truncate">{model}</div>
                 </div>
-                <div className="space-y-3">
-                  <CustomCheckbox checked={stream} onChange={setStream} label={t.playground.streamResponse} />
-                </div>
-                <div className="space-y-3 flex-1 flex flex-col">
-                  <label className="font-bold text-ink">{t.playground.systemPrompt}</label>
-                  <CustomTextarea value="" onChange={() => {}} placeholder={t.playground.systemPromptPlaceholder} className="flex-1 !min-h-[150px]" />
-                </div>
-              </section>
 
-              <section className="flex-1 flex flex-col glass-card rounded-2xl overflow-hidden shadow-sm relative">
-                <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                <div className="card p-4">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-xs font-medium text-body">{t.playground.streamResponse}</span>
+                    <button type="button" role="switch" aria-checked={stream} onClick={() => setStream(!stream)} className={`w-10 h-5.5 rounded-full p-0.5 transition-colors relative ${stream ? 'bg-ink' : 'bg-hairline-strong'}`}>
+                      <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${stream ? 'translate-x-4.5' : 'translate-x-0'}`}></div>
+                    </button>
+                  </label>
+                </div>
+
+                <div className="card p-4 flex-1 flex flex-col min-h-0">
+                  <label className="text-xs font-medium text-body mb-2">{t.playground.systemPrompt}</label>
+                  <textarea
+                    value=""
+                    onChange={() => {}}
+                    placeholder={t.playground.systemPromptPlaceholder}
+                    className="custom-textarea flex-1 w-full p-3 bg-canvas-soft border border-hairline rounded-lg text-xs text-ink outline-none focus:border-hairline-strong transition-colors resize-none placeholder:text-body/50"
+                  />
+                </div>
+              </aside>
+
+              {/* Chat area */}
+              <section className="flex-1 flex flex-col card overflow-hidden min-h-0">
+                <div className="flex-1 overflow-y-auto p-5 space-y-5">
                   {chatMessages.map((msg, idx) => (
-                    <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'max-w-[80%] ml-auto flex-row-reverse' : ''}`}>
-                      <div className={`w-8 h-8 rounded flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${msg.role === 'user' ? 'bg-ink text-white' : 'bg-mint text-ink'}`}>
-                        {msg.role === 'user' ? 'U' : <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>}
+                    <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'max-w-[80%] ml-auto flex-row-reverse' : ''}`}>
+                      <div className={`w-7 h-7 rounded-lg shrink-0 flex items-center justify-center text-[10px] font-medium ${msg.role === 'user' ? 'bg-ink text-white' : 'bg-mint-soft text-mint'}`}>
+                        {msg.role === 'user' ? 'U' : <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>}
                       </div>
-                      <div className={`flex-1 ${msg.role === 'user' ? '' : 'space-y-4'}`}>
+                      <div className={`flex-1 min-w-0 ${msg.role === 'user' ? '' : 'space-y-3'}`}>
                         {msg.role === 'user' ? (
-                          <div className="bg-canvas-soft border border-hairline p-4 rounded-xl rounded-tl-none"><p className="text-ink whitespace-pre-wrap">{msg.content}</p></div>
+                          <div className="bg-ink text-white p-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</div>
                         ) : msg.content === '' ? (
-                          <div className="flex items-center gap-2 text-body py-1 text-xs font-semibold animate-pulse">
-                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                          <div className="flex items-center gap-2 text-body py-1 text-xs animate-pulse">
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                             {t.playground.waiting}
                           </div>
                         ) : renderMessageContent(msg.content)}
@@ -1389,11 +1342,18 @@ export default function App() {
                   ))}
                   <div ref={chatEndRef} />
                 </div>
-                <form onSubmit={handleSendChat} className="p-8 border-t border-hairline bg-white/50">
-                  <div className="flex items-center gap-3">
-                    <CustomTextarea value={chatInput} onChange={setChatInput} placeholder={t.playground.ask} className="flex-1" />
-                    <button type="submit" disabled={generating || !chatInput.trim()} className="h-11 px-4 bg-ink text-white rounded-xl flex items-center gap-2 hover:bg-neutral-800 transition-all active:scale-95 shadow-md disabled:opacity-50 shrink-0">
-                      <span className="font-bold text-sm">{t.playground.send}</span><span className="material-symbols-outlined text-sm">send</span>
+                <form onSubmit={handleSendChat} className="p-4 border-t border-hairline bg-canvas-soft">
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      placeholder={t.playground.ask}
+                      rows={1}
+                      className="custom-textarea flex-1 px-3.5 py-2.5 bg-white border border-hairline rounded-xl text-sm text-ink outline-none focus:border-hairline-strong transition-colors resize-none placeholder:text-body/50"
+                    />
+                    <button type="submit" disabled={generating || !chatInput.trim()} className="px-4 py-2.5 bg-ink text-white rounded-xl flex items-center gap-1.5 hover:bg-primary transition-colors active:scale-95 disabled:opacity-40 shrink-0 text-sm font-medium">
+                      <span className="material-symbols-outlined text-[16px]">send</span>
+                      <span className="hidden sm:inline">{t.playground.send}</span>
                     </button>
                   </div>
                 </form>
@@ -1403,143 +1363,188 @@ export default function App() {
 
           {/* ─── API KEYS ─── */}
           {activeTab === 'api-keys' && (
-            <div className="space-y-8">
-              <div className="flex justify-between items-end">
-                <p className="text-body font-medium max-w-xl">{t.api.desc}</p>
-                <button onClick={handleGenerateKey} className="bg-ink text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-neutral-800 transition-all font-bold shadow-md">
-                  <span className="material-symbols-outlined text-[20px]">add</span>{t.api.generate}
+            <div className="space-y-5">
+              {/* Toolbar */}
+              <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p className="text-xs text-body">{t.api.desc}</p>
+                <button onClick={handleGenerateKey} className="flex items-center gap-1.5 px-4 py-2 bg-ink text-white rounded-lg hover:bg-primary transition-colors text-xs font-medium">
+                  <span className="material-symbols-outlined text-[16px]">add</span>{t.api.generate}
                 </button>
-              </div>
+              </section>
 
-              <div className="grid grid-cols-12 gap-8">
-                <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-                  <div className="glass-card p-8 rounded-2xl flex flex-col justify-between min-h-[220px]">
-                    <div><h3 className="font-bold text-ink text-lg mb-2">{t.api.gatewayAuth}</h3><p className="text-body text-sm">{t.api.gatewayAuthDesc}</p></div>
-                    <div className="flex items-center justify-between pt-6 border-t border-hairline mt-auto">
-                      <span className="text-[10px] font-bold text-body uppercase tracking-widest">{t.api.systemStatus}</span>
-                      <button className={`w-11 h-6 rounded-full p-0.5 transition-colors relative ${apiConfig.auth_required ? 'bg-ink' : 'bg-hairline-strong'}`} onClick={handleToggleAuth}>
-                        <div className={`w-5 h-5 bg-white rounded-full transition-transform duration-200 ${apiConfig.auth_required ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                      </button>
-                    </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Gateway auth toggle */}
+                <div className="card p-5 flex flex-col justify-between min-h-[160px]">
+                  <div>
+                    <div className="text-xs font-medium text-ink mb-1.5">{t.api.gatewayAuth}</div>
+                    <p className="text-[11px] text-body leading-relaxed">{t.api.gatewayAuthDesc}</p>
                   </div>
-                  <div className="glass-card p-4 rounded-xl">
-                    <span className="text-[10px] font-bold text-body uppercase tracking-widest">{t.api.activeKeys}</span>
-                    <div className="mt-2 flex items-baseline gap-2"><span className="font-display-sm text-ink">{apiConfig.allowed_keys.length}</span><span className="text-[10px] text-body font-bold">{t.api.configured}</span></div>
+                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-hairline">
+                    <span className="text-[10px] font-medium text-body uppercase tracking-wide">{t.api.systemStatus}</span>
+                    <button className={`w-10 h-5.5 rounded-full p-0.5 transition-colors relative ${apiConfig.auth_required ? 'bg-ink' : 'bg-hairline-strong'}`} onClick={handleToggleAuth}>
+                      <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${apiConfig.auth_required ? 'translate-x-4.5' : 'translate-x-0'}`}></div>
+                    </button>
                   </div>
                 </div>
-                <div className="col-span-12 lg:col-span-8 glass-card rounded-2xl overflow-hidden flex flex-col shadow-sm">
-                  <div className="p-6 flex items-center justify-between border-b border-hairline">
-                    <span className="font-bold">{t.api.activeAccessKeys}</span>
-                    <div className="flex gap-2">
-                      <CustomInput value={newKey} onChange={setNewKey} placeholder={t.api.keyPlaceholder} className="!w-64 !py-2 !bg-canvas-soft !border-hairline" mono />
-                      <button onClick={handleAddKey} disabled={!newKey.trim()} className="bg-ink text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-neutral-800 transition-all disabled:opacity-50">{t.common.add}</button>
-                    </div>
+
+                {/* Active keys count */}
+                <div className="card p-5 flex flex-col justify-between min-h-[160px]">
+                  <div className="text-xs font-medium text-body">{t.api.activeKeys}</div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-semibold text-ink">{apiConfig.allowed_keys.length}</span>
+                    <span className="text-[11px] text-body">{t.api.configured}</span>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead className="bg-canvas-soft/50 border-b border-hairline"><tr>{['Key String', 'Actions'].map(h => (<th key={h} className="px-6 py-4 text-[10px] font-semibold text-body uppercase tracking-widest">{h}</th>))}</tr></thead>
-                      <tbody className="divide-y divide-hairline">
-                        {apiConfig.allowed_keys.length === 0 ? (
-                          <tr><td colSpan={2} className="py-6 text-center text-xs text-body font-medium">{t.api.noKeys}</td></tr>
-                        ) : apiConfig.allowed_keys.map((key) => (
-                          <tr key={key} className="hover:bg-canvas-soft/30 transition-colors">
-                            <td className="px-6 py-5 font-mono text-xs tracking-wider text-body opacity-80 select-all break-all">{key}</td>
-                            <td className="px-6 py-5 text-right">
-                              <div className="flex justify-end gap-2">
-                                <button onClick={() => handleCopyKey(key)} className="p-1.5 text-body hover:text-ink" title="Copy"><span className="material-symbols-outlined text-[18px]">{copiedKey === key ? 'check_circle' : 'content_copy'}</span></button>
-                                <button onClick={() => handleDeleteKey(key)} className="p-1.5 text-red-400 hover:text-red-600" title="Delete"><span className="material-symbols-outlined text-[18px]">block</span></button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="flex items-center gap-1.5 text-[11px] text-mint">
+                    <span className="w-1.5 h-1.5 rounded-full bg-mint"></span>
+                    {apiConfig.auth_required ? (lang === 'zh' ? '鉴权已启用' : 'Auth enabled') : (lang === 'zh' ? '开放访问模式' : 'Open access')}
+                  </div>
+                </div>
+
+                {/* Best practices hint */}
+                <div className="card p-5 flex flex-col justify-between min-h-[160px]">
+                  <div className="text-xs font-medium text-body mb-1">{t.api.bestPractices}</div>
+                  <p className="text-[11px] text-body leading-relaxed flex-1">{t.api.bestPracticesDesc}</p>
+                  <div className="flex items-center gap-1.5 text-mint-soft bg-mint text-[10px] font-medium px-2 py-1 rounded self-start">
+                    <span className="material-symbols-outlined text-[12px]">shield</span>
+                    {t.api.securityPolicy}
                   </div>
                 </div>
               </div>
 
-              <section className="bg-ink text-white p-8 rounded-2xl flex items-center justify-between relative overflow-hidden shadow-xl">
-                <div className="relative z-10 max-w-xl">
-                  <h2 className="font-display-sm mb-4">{t.api.bestPractices}</h2>
-                  <p className="text-white/70 font-medium leading-relaxed text-sm">{t.api.bestPracticesDesc}</p>
-                  <button className="mt-8 border border-white/20 px-6 py-2.5 rounded-xl hover:bg-white/10 transition-all font-bold text-xs uppercase tracking-wider">{t.api.securityPolicy}</button>
+              {/* Keys table */}
+              <section className="card overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-hairline flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <span className="text-xs font-medium text-ink">{t.api.activeAccessKeys}</span>
+                  <div className="flex gap-2">
+                    <input
+                      value={newKey}
+                      onChange={e => setNewKey(e.target.value)}
+                      placeholder={t.api.keyPlaceholder}
+                      className="w-56 px-3 py-1.5 bg-canvas-soft border border-hairline rounded-lg text-xs font-mono text-ink outline-none focus:border-hairline-strong transition-colors"
+                    />
+                    <button onClick={handleAddKey} disabled={!newKey.trim()} className="px-3.5 py-1.5 bg-ink text-white rounded-lg text-xs font-medium hover:bg-primary transition-colors disabled:opacity-40">{t.common.add}</button>
+                  </div>
                 </div>
-                <div className="hidden lg:block opacity-20"><span className="material-symbols-outlined" style={{ fontSize: '120px', fontVariationSettings: "'FILL' 1" }}>shield</span></div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-hairline bg-canvas-soft">
+                        <th className="px-5 py-2.5 text-[10px] font-medium text-body uppercase tracking-wide">Key</th>
+                        <th className="px-5 py-2.5 text-[10px] font-medium text-body uppercase tracking-wide text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-hairline">
+                      {apiConfig.allowed_keys.length === 0 ? (
+                        <tr><td colSpan={2} className="py-10 text-center text-xs text-body">{t.api.noKeys}</td></tr>
+                      ) : apiConfig.allowed_keys.map((key) => (
+                        <tr key={key} className="hover:bg-canvas-soft transition-colors group">
+                          <td className="px-5 py-3.5 font-mono text-xs text-ink select-all break-all">{key}</td>
+                          <td className="px-5 py-3.5 text-right">
+                            <div className="flex justify-end gap-1">
+                              <button onClick={() => handleCopyKey(key)} className="p-1.5 text-body hover:text-ink hover:bg-hairline rounded-lg transition-colors" title="Copy">
+                                <span className="material-symbols-outlined text-[16px]">{copiedKey === key ? 'check_circle' : 'content_copy'}</span>
+                              </button>
+                              <button onClick={() => handleDeleteKey(key)} className="p-1.5 text-body hover:text-toast-error hover:bg-toast-error/10 rounded-lg transition-colors" title="Delete">
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </section>
             </div>
           )}
 
           {/* ─── LOGS ─── */}
           {activeTab === 'logs' && (
-            <div className="space-y-8">
-              <div className="relative z-[4000] grid grid-cols-1 md:grid-cols-4 gap-4 p-6 bg-white/60 backdrop-blur-md border border-hairline rounded-2xl">
-                <div className="space-y-2">
-                  <label className="text-[11px] font-semibold text-body uppercase opacity-60 tracking-wider">{t.logs.account}</label>
+            <div className="space-y-4">
+              {/* Filters */}
+              <section className="relative z-40 card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-medium text-body uppercase tracking-wide block">{t.logs.account}</label>
                   <CustomSelect value={logFilterAccount} onChange={setLogFilterAccount} options={accountLogOptions.map((option, index) => index === 0 ? { ...option, label: t.logs.allAccounts } : option)} placeholder={t.logs.allAccounts} />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[11px] font-semibold text-body uppercase opacity-60 tracking-wider">{t.logs.status}</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-medium text-body uppercase tracking-wide block">{t.logs.status}</label>
                   <CustomSelect value={logFilterStatus} onChange={setLogFilterStatus} options={[{ value: 'all', label: t.logs.allStatuses }, { value: 'info', label: 'Info' }, { value: 'error', label: 'Error' }, { value: 'warning', label: 'Warning' }]} placeholder={t.logs.allStatuses} />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[11px] font-semibold text-body uppercase opacity-60 tracking-wider">{t.logs.range}</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-medium text-body uppercase tracking-wide block">{t.logs.range}</label>
                   <CustomSelect value={logFilterRange} onChange={setLogFilterRange} options={[{ value: '24h', label: t.logs.last24h }, { value: '1h', label: t.logs.lastHour }, { value: '7d', label: t.logs.last7d }]} placeholder={t.logs.last24h} />
                 </div>
                 <div className="flex items-end">
-                  <button onClick={() => { fetchLogs(); pushToast('INFO', 'Logs Refreshed', 'Log entries updated') }} className="w-full h-11 bg-ink text-white rounded-xl flex items-center justify-center gap-2 hover:bg-neutral-800 transition-all shadow-sm">
-                    <span className="material-symbols-outlined text-sm">filter_list</span><span className="font-bold text-sm">{t.common.refresh}</span>
+                  <button onClick={() => { fetchLogs(); pushToast('INFO', t.logs.noLogs, '') }} className="w-full h-11 bg-ink text-white rounded-lg flex items-center justify-center gap-1.5 hover:bg-primary transition-colors text-xs font-medium">
+                    <span className="material-symbols-outlined text-[16px]">refresh</span>{t.common.refresh}
                   </button>
                 </div>
-              </div>
+              </section>
 
-              <div className="relative z-0 bg-white/80 backdrop-blur-xl border border-hairline rounded-2xl overflow-hidden">
-                <table className="w-full text-left">
-                  <thead><tr className="bg-canvas-soft border-b border-hairline">{[t.logs.timestamp, t.logs.level, t.logs.message].map(h => (<th key={h} className="px-6 py-4 text-[10px] font-semibold text-body uppercase tracking-widest">{h}</th>))}</tr></thead>
-                  <tbody className="divide-y divide-hairline">
-                    {logs.length === 0 ? (
-                      <tr><td colSpan={3} className="py-8 text-center text-xs text-body font-medium">{t.logs.noLogs}</td></tr>
-                    ) : filteredLogs.length === 0 ? (
-                      <tr><td colSpan={3} className="py-8 text-center text-xs text-body font-medium">{t.logs.noMatch}</td></tr>
-                    ) : filteredLogs.map((log, i) => {
-                      const isError = log.includes('[ERROR]') || log.includes('[WARNING]')
-                      return (
-                        <tr key={i} className={`hover:bg-black/5 transition-colors ${isError ? 'bg-red-50' : ''}`}>
-                          <td className="px-6 py-4 font-mono text-[13px] text-body whitespace-nowrap">{log.substring(0, 10)}</td>
-                          <td className="px-6 py-4">
-                            <span className={`px-2 py-1 rounded text-[11px] font-bold uppercase ${log.includes('[ERROR]') ? 'bg-red-50 text-red-700' : log.includes('[WARNING]') ? 'bg-peach/20 text-ink' : 'bg-mint/20 text-ink'}`}>
-                              {log.match(/\[(INFO|ERROR|WARNING)\]/)?.[1] || 'INFO'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 font-mono text-[13px] text-ink opacity-80 break-all">{log.replace(/^\[[\d:]+\]\s*\[\w+\]\s*/, '')}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-                <div ref={logEndRef} />
-              </div>
+              {/* Log list */}
+              <section className="card overflow-hidden">
+                <div className="max-h-[calc(100vh-18rem)] overflow-y-auto">
+                  <table className="w-full text-left">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-canvas-soft border-b border-hairline">
+                        {[t.logs.timestamp, t.logs.level, t.logs.message].map(h => (
+                          <th key={h} className="px-5 py-2.5 text-[10px] font-medium text-body uppercase tracking-wide">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-hairline">
+                      {logs.length === 0 ? (
+                        <tr><td colSpan={3} className="py-12 text-center text-xs text-body">{t.logs.noLogs}</td></tr>
+                      ) : filteredLogs.length === 0 ? (
+                        <tr><td colSpan={3} className="py-12 text-center text-xs text-body">{t.logs.noMatch}</td></tr>
+                      ) : filteredLogs.map((log, i) => {
+                        const level = log.match(/\[(INFO|ERROR|WARNING)\]/)?.[1] || 'INFO'
+                        const isError = level === 'ERROR'
+                        const isWarn = level === 'WARNING'
+                        return (
+                          <tr key={i} className={`hover:bg-canvas-soft transition-colors ${isError ? 'bg-toast-error/5' : isWarn ? 'bg-peach-soft/40' : ''}`}>
+                            <td className="px-5 py-2.5 font-mono text-[11px] text-body whitespace-nowrap">{log.substring(0, 10)}</td>
+                            <td className="px-5 py-2.5">
+                              <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-medium ${
+                                isError ? 'bg-toast-error/10 text-toast-error'
+                                : isWarn ? 'bg-peach/10 text-peach'
+                                : 'bg-mint-soft text-mint'
+                              }`}>
+                                {level}
+                              </span>
+                            </td>
+                            <td className="px-5 py-2.5 font-mono text-[11px] text-ink break-all">{log.replace(/^\[[\d:]+\]\s*\[\w+\]\s*/, '')}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  <div ref={logEndRef} />
+                </div>
+              </section>
             </div>
           )}
 
           {/* ─── AUTO REGISTRAR ─── */}
           {activeTab === 'register' && (
-            <div className="space-y-6">
-              <div className="relative z-[4000] flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-white/60 backdrop-blur-md border border-hairline rounded-2xl">
-                <div>
-                  <h2 className="text-lg font-semibold text-ink">{t.title.register}</h2>
-                  <p className="text-sm text-body mt-1 max-w-2xl">{t.register.desc}</p>
-                  <p className="text-xs text-body opacity-70 mt-1">{t.register.staggerHint}</p>
+            <div className="space-y-5">
+              {/* Control panel */}
+              <section className="card p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-xs text-body leading-relaxed">{t.register.desc}</p>
+                  <p className="text-[11px] text-body opacity-70 mt-1">{t.register.staggerHint}</p>
                 </div>
-                <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap shrink-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-ink">{t.register.countLabel}</span>
-                    <div className="flex bg-white border border-hairline rounded-xl p-1 gap-1">
+                    <span className="text-xs font-medium text-body">{t.register.countLabel}</span>
+                    <div className="flex bg-canvas-soft rounded-lg p-0.5 gap-0.5">
                       {[1, 2, 3, 4].map(n => (
                         <button
                           key={n}
                           onClick={() => setRegCount(n)}
                           disabled={regStatus?.running}
-                          className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${regCount === n ? 'bg-ink text-white' : 'text-body hover:bg-black/5'}`}
+                          className={`w-8 h-8 rounded-md text-xs font-medium transition-colors ${regCount === n ? 'bg-ink text-white' : 'text-body hover:bg-hairline'}`}
                         >{n}</button>
                       ))}
                     </div>
@@ -1548,105 +1553,145 @@ export default function App() {
                     <button
                       onClick={stopRegister}
                       disabled={regStopping || regStatus?.stop_requested}
-                      className={`h-11 px-6 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm font-bold text-sm ${regStopping || regStatus?.stop_requested ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'}`}
+                      className={`h-9 px-4 rounded-lg flex items-center justify-center gap-1.5 transition-colors text-xs font-medium ${regStopping || regStatus?.stop_requested ? 'bg-hairline text-body cursor-not-allowed' : 'bg-toast-error text-white hover:bg-toast-error/90'}`}
                     >
-                      <span className="material-symbols-outlined text-sm">stop_circle</span>
-                      <span>{regStopping ? t.register.stopping : regStatus?.stop_requested ? t.register.stopping : t.register.stop}</span>
+                      <span className="material-symbols-outlined text-[16px]">stop_circle</span>
+                      <span>{regStopping || regStatus?.stop_requested ? t.register.stopping : t.register.stop}</span>
                     </button>
                   ) : (
                     <button
                       onClick={startRegister}
                       disabled={regStarting}
-                      className={`h-11 px-6 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm font-bold text-sm ${regStarting ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed' : 'bg-ink text-white hover:bg-neutral-800'}`}
+                      className={`h-9 px-4 rounded-lg flex items-center justify-center gap-1.5 transition-colors text-xs font-medium ${regStarting ? 'bg-hairline text-body cursor-not-allowed' : 'bg-ink text-white hover:bg-primary'}`}
                     >
-                      <span className="material-symbols-outlined text-sm">person_add</span>
+                      <span className="material-symbols-outlined text-[16px]">person_add</span>
                       <span>{regStarting ? t.register.starting : t.register.start}</span>
                     </button>
                   )}
                 </div>
-              </div>
+              </section>
 
+              {/* Verification banner */}
               {regStatus?.verification && regStatus?.running && (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-sm text-amber-800 flex items-center gap-2 animate-pulse">
-                  <span className="material-symbols-outlined text-base">touch_app</span>
+                <div className="p-3.5 bg-peach-soft border border-peach/30 rounded-xl text-xs text-ink flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-peach animate-pulse">touch_app</span>
                   <span>{t.register.verifyHint}（{t.register.task} {regStatus.verification}）</span>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="p-6 bg-white/60 backdrop-blur-md border border-hairline rounded-2xl">
-                  <label className="text-[11px] font-semibold text-body uppercase opacity-60 tracking-wider">{t.register.statsLabel}</label>
-                  <div className="mt-2 text-3xl font-bold text-ink">{regStatus?.stats?.total ?? 0}</div>
+              {/* Stats row */}
+              <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="card p-4">
+                  <div className="text-[10px] font-medium text-body uppercase tracking-wide mb-1">{t.register.statsLabel}</div>
+                  <div className="text-2xl font-semibold text-ink">{regStatus?.stats?.total ?? 0}</div>
                 </div>
-                <div className="p-6 bg-white/60 backdrop-blur-md border border-hairline rounded-2xl">
-                  <label className="text-[11px] font-semibold text-emerald-600 uppercase opacity-80 tracking-wider">{t.register.success}</label>
-                  <div className="mt-2 text-3xl font-bold text-emerald-600">{regStatus?.stats?.success ?? 0}</div>
+                <div className="card p-4">
+                  <div className="text-[10px] font-medium text-mint uppercase tracking-wide mb-1">{t.register.success}</div>
+                  <div className="text-2xl font-semibold text-mint">{regStatus?.stats?.success ?? 0}</div>
                 </div>
-                <div className="p-6 bg-white/60 backdrop-blur-md border border-hairline rounded-2xl">
-                  <label className="text-[11px] font-semibold text-red-600 uppercase opacity-80 tracking-wider">{t.register.failed}</label>
-                  <div className="mt-2 text-3xl font-bold text-red-600">{regStatus?.stats?.failed ?? 0}</div>
+                <div className="card p-4">
+                  <div className="text-[10px] font-medium text-toast-error uppercase tracking-wide mb-1">{t.register.failed}</div>
+                  <div className="text-2xl font-semibold text-toast-error">{regStatus?.stats?.failed ?? 0}</div>
                 </div>
-                <div className="p-6 bg-white/60 backdrop-blur-md border border-hairline rounded-2xl">
-                  <label className="text-[11px] font-semibold text-body uppercase opacity-60 tracking-wider">{lang === 'zh' ? '启动时间' : 'Started At'}</label>
-                  <div className="mt-2 font-mono text-sm text-ink">{regStatus?.started_at ? new Date(regStatus.started_at * 1000).toLocaleTimeString() : '—'}</div>
+                <div className="card p-4">
+                  <div className="text-[10px] font-medium text-body uppercase tracking-wide mb-1">{lang === 'zh' ? '启动时间' : 'Started At'}</div>
+                  <div className="text-sm font-mono text-ink mt-1.5">{regStatus?.started_at ? new Date(regStatus.started_at * 1000).toLocaleTimeString() : '—'}</div>
                 </div>
-              </div>
+              </section>
 
+              {/* Tasks list */}
               {(() => {
                 const allTasks = { ...(regStatus?.active || {}), ...(regStatus?.recent || {}) }
                 const entries = Object.entries(allTasks)
                 if (entries.length === 0) {
-                  return <div className="p-10 text-center text-sm text-body bg-white/60 backdrop-blur-md border border-hairline rounded-2xl">{t.register.noResult}</div>
+                  return <div className="card p-10 text-center text-xs text-body">{t.register.noResult}</div>
                 }
-                return entries.map(([tid, task]) => {
-                  const stageText = (t.register.stage as Record<string, string>)[task.stage] || task.stage
-                  const isVerify = regStatus?.verification === tid
-                  const isActive = !!regStatus?.active?.[tid]
-                  return (
-                    <div key={tid} className={`relative z-0 bg-white/80 backdrop-blur-xl border rounded-2xl overflow-hidden ${isVerify ? 'border-amber-400 ring-2 ring-amber-200' : 'border-hairline'}`}>
-                      <div className="px-6 py-4 border-b border-hairline flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-semibold text-ink">{t.register.task} {tid}</span>
-                          <span className={`px-2 py-1 rounded text-[11px] font-bold uppercase ${task.stage === 'success' ? 'bg-emerald-100 text-emerald-700' : task.stage === 'failed' ? 'bg-red-50 text-red-700' : task.stage === 'waiting_slider' ? 'bg-amber-100 text-amber-700' : 'bg-neutral-100 text-neutral-600'}`}>{stageText}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-body font-mono">
-                          <span className={`h-2.5 w-2.5 rounded-full inline-block ${isActive ? (task.stage === 'success' ? 'bg-emerald-500' : task.stage === 'failed' ? 'bg-red-500' : 'bg-amber-400 animate-pulse') : 'bg-neutral-300'}`} />
-                          <span>{task.started_at ? new Date(task.started_at * 1000).toLocaleTimeString() : ''}</span>
-                        </div>
-                      </div>
-                      <div className="p-6 h-48 overflow-y-auto font-mono text-[13px] leading-relaxed text-ink opacity-80 space-y-1">
-                        {task.logs.slice().reverse().map((line, i) => (
-                          <div key={i} className={`break-all ${/FAILED|ERROR/i.test(line) ? 'text-red-600' : ''}`}>{line}</div>
-                        ))}
-                      </div>
-                      {task.result && (
-                        <div className="px-6 pb-6 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm border-t border-hairline">
-                          {[
-                            { label: lang === 'zh' ? '邮箱' : 'Email', value: task.result.email },
-                            { label: lang === 'zh' ? '密码' : 'Password', value: task.result.password },
-                            { label: lang === 'zh' ? '姓名' : 'Name', value: task.result.name },
-                            { label: 'Token (dt-)', value: task.result.device.token },
-                            { label: 'Refresh (drt-)', value: task.result.device.refresh_token },
-                            { label: 'UID', value: task.result.device.user_id },
-                          ].map((f, i) => (
-                            <div key={i}>
-                              <div className="text-[11px] font-semibold text-body uppercase opacity-60 tracking-wider">{f.label}</div>
-                              <div className="mt-1 font-mono text-ink break-all">{f.value}</div>
+                return (
+                  <div className="space-y-3">
+                    {entries.map(([tid, task]) => {
+                      const stageText = (t.register.stage as Record<string, string>)[task.stage] || task.stage
+                      const isVerify = regStatus?.verification === tid
+                      const isActive = !!regStatus?.active?.[tid]
+                      return (
+                        <div key={tid} className={`card overflow-hidden ${isVerify ? 'ring-2 ring-peach/40' : ''}`}>
+                          <div className="px-5 py-3 border-b border-hairline flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-ink">{t.register.task} {tid}</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                                task.stage === 'success' ? 'bg-mint-soft text-mint'
+                                : task.stage === 'failed' ? 'bg-toast-error/10 text-toast-error'
+                                : task.stage === 'waiting_slider' ? 'bg-peach-soft text-peach'
+                                : 'bg-canvas-soft text-body'
+                              }`}>{stageText}</span>
                             </div>
-                          ))}
+                            <div className="flex items-center gap-2 text-[11px] text-body font-mono">
+                              <span className={`w-1.5 h-1.5 rounded-full inline-block ${isActive ? (task.stage === 'success' ? 'bg-mint' : task.stage === 'failed' ? 'bg-toast-error' : 'bg-peach animate-pulse') : 'bg-hairline-strong'}`} />
+                              <span>{task.started_at ? new Date(task.started_at * 1000).toLocaleTimeString() : ''}</span>
+                            </div>
+                          </div>
+                          <div className="px-5 py-3 h-32 overflow-y-auto font-mono text-[11px] leading-relaxed text-body space-y-0.5 bg-canvas-soft">
+                            {task.logs.slice().reverse().map((line, i) => (
+                              <div key={i} className={`break-all ${/FAILED|ERROR/i.test(line) ? 'text-toast-error' : ''}`}>{line}</div>
+                            ))}
+                          </div>
+                          {task.result && (
+                            <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs border-t border-hairline">
+                              {[
+                                { label: lang === 'zh' ? '邮箱' : 'Email', value: task.result.email },
+                                { label: lang === 'zh' ? '密码' : 'Password', value: task.result.password },
+                                { label: lang === 'zh' ? '姓名' : 'Name', value: task.result.name },
+                                { label: 'Token', value: task.result.device.token },
+                                { label: 'Refresh', value: task.result.device.refresh_token },
+                                { label: 'UID', value: task.result.device.user_id },
+                              ].map((f, i) => (
+                                <div key={i} className="min-w-0">
+                                  <div className="text-[10px] font-medium text-body uppercase tracking-wide">{f.label}</div>
+                                  <div className="mt-0.5 font-mono text-ink break-all truncate">{f.value}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {task.error && (
+                            <div className="px-5 py-3 text-xs text-toast-error border-t border-hairline">{task.error}</div>
+                          )}
                         </div>
-                      )}
-                      {task.error && (
-                        <div className="px-6 pb-6 text-sm text-red-700">{task.error}</div>
-                      )}
-                    </div>
-                  )
-                })
+                      )
+                    })}
+                  </div>
+                )
               })()}
             </div>
           )}
         </div>
       </main>
+
+      {/* Bottom Dock Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-4 pointer-events-none">
+        <div className="pointer-events-auto flex items-center gap-1 px-3 py-2 bg-surface/90 backdrop-blur-md border border-hairline rounded-2xl shadow-lg">
+          {NAV_ITEMS.map((item) => {
+            const isActive = activeTab === item.id
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`relative flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all ${
+                  isActive
+                    ? 'bg-ink text-white'
+                    : 'text-body hover:bg-canvas-soft hover:text-ink'
+                }`}
+                title={navLabels[item.id]}
+              >
+                <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: isActive ? "'FILL' 1" : "" }}>
+                  {item.icon}
+                </span>
+                <span className="text-[9px] font-medium mt-0.5 truncate max-w-full px-1">
+                  {navLabels[item.id].split(' ')[0]}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </nav>
 
       <ToastContainer toasts={toasts} dismiss={dismissToast} />
     </div>
