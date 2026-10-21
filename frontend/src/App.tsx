@@ -343,7 +343,7 @@ export default function App() {
     { role: 'assistant', content: 'Hello! I am the QoderGate AI assistant. Ask me anything — I support Markdown and LaTeX math.' }
   ])
   const [chatInput, setChatInput] = useState('')
-  const [model, setModel] = useState('lite')
+  const [model, setModel] = useState('auto')
   const [stream, setStream] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [showThinking, setShowThinking] = useState(true)
@@ -407,6 +407,14 @@ export default function App() {
     'api-keys': t.nav.apiKeys,
     logs: t.nav.logs,
     register: t.nav.register,
+  }
+  const navShort: Record<AppTabId, string> = {
+    dashboard: lang === 'zh' ? '控制台' : 'Home',
+    accounts: lang === 'zh' ? '账号池' : 'Accounts',
+    playground: lang === 'zh' ? '调试' : 'Playground',
+    'api-keys': lang === 'zh' ? '密钥' : 'Keys',
+    register: lang === 'zh' ? '注册' : 'Register',
+    logs: lang === 'zh' ? '日志' : 'Logs',
   }
   const pageMeta: Record<AppTabId, { bc: string; title: string }> = {
     dashboard: { bc: t.breadcrumb.dashboard, title: t.title.dashboard },
@@ -906,7 +914,7 @@ export default function App() {
                 const targetC = campaigns.find((c: any) => c.actionType === 'CLAIM_BENEFIT') || campaigns[0]
                 const isClaimed = targetC?.claimStatus === 'CLAIMED'
                 const uq = usageData?.quota?.userQuota || { total: 300, used: 0, remaining: 300 }
-                const addOn = usageData?.quota?.addOnQuota || { remaining: 0 }
+                const addOn = usageData?.quota?.addOnQuota || { remaining: 0, total: 0, used: 0 }
 
                 return (
                   <section ref={statCardsRef} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -969,8 +977,8 @@ export default function App() {
 
               {/* Usage Analytics - 3 columns compact */}
               {(() => {
-                const uq = usageData?.quota?.userQuota || { total: 300, used: 1, remaining: 299, percentage: 0.01 }
-                const addOn = usageData?.quota?.addOnQuota || { total: 100, remaining: 100, used: 0 }
+                const uq = usageData?.quota?.userQuota || { total: 300, used: 0, remaining: 300 }
+                const addOn = usageData?.quota?.addOnQuota || { total: 0, remaining: 0, used: 0 }
                 const expiresAt = usageData?.quota?.expiresAt ? new Date(usageData.quota.expiresAt).toLocaleDateString('zh-CN') : '2026/11/20'
                 const userType = usageData?.quota?.userType || 'personal_professional_trial'
                 const usedPct = Math.min(100, Math.round(((uq.used || 0) / (uq.total || 300)) * 100))
@@ -1685,7 +1693,7 @@ export default function App() {
                   {item.icon}
                 </span>
                 <span className="text-[9px] font-medium mt-0.5 truncate max-w-full px-1">
-                  {navLabels[item.id].split(' ')[0]}
+                  {navShort[item.id]}
                 </span>
               </button>
             )
